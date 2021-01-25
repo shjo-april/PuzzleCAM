@@ -73,3 +73,7 @@ CUDA_VISIBLE_DEVICES=0 python3 inference_segmentation.py --backbone resnest101 -
 Qualitative segmentation results on the PASCAL VOC 2012 validation set. 
 Top: original images. Middle: ground truth. Bottom: prediction of the segmentation model trained using the pseudo-labels from Puzzle-CAM.
 ![Overall architecture](./res/results.PNG)
+
+<br>
+
+For any issues, please contact <b>Sanghyun Jo</b>, josanghyeokn@gmail.com
