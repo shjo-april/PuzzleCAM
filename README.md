@@ -4,6 +4,12 @@ The official implementation of "Puzzle-CAM: Improved localization via matching p
 ## Citation
 Please cite our paper if the code is helpful to your research.
 ```
+@article{jo2021puzzle,
+  title={Puzzle-CAM: Improved localization via matching partial and full features},
+  author={Jo, Sanhyun and Yu, In-Jae},
+  journal={arXiv preprint arXiv:2101.11253},
+  year={2021}
+}
 ```
 
 ## Abstract
