@@ -42,7 +42,7 @@ def compare(start,step,TP,P,T, name_list):
 
         if os.path.isfile(predict_folder + name + '.npy'):
             predict_dict = np.load(os.path.join(predict_folder, name + '.npy'), allow_pickle=True).item()
-
+            
             if 'hr_cam' in predict_dict.keys():
                 cams = predict_dict['hr_cam']
                 cams = np.pad(cams, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
