@@ -1,3 +1,4 @@
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/puzzle-cam-improved-localization-via-matching/weakly-supervised-semantic-segmentation-on-1)](https://paperswithcode.com/sota/weakly-supervised-semantic-segmentation-on-1?p=puzzle-cam-improved-localization-via-matching)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/puzzle-cam-improved-localization-via-matching/weakly-supervised-semantic-segmentation-on)](https://paperswithcode.com/sota/weakly-supervised-semantic-segmentation-on?p=puzzle-cam-improved-localization-via-matching)
 
 # Puzzle-CAM
