@@ -85,6 +85,11 @@ Qualitative segmentation results on the PASCAL VOC 2012 validation set.
 Top: original images. Middle: ground truth. Bottom: prediction of the segmentation model trained using the pseudo-labels from Puzzle-CAM.
 ![Overall architecture](./res/results.PNG)
 
+| Methods | background | aeroplane | bicycle | bird | boat | bottle | bus | car | cat | chair | cow | diningtable | dog | horse | motorbike | person | pottedplant | sheep | sofa | train | tvmonitor | mIoU |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Puzzle-CAM with ResNeSt-101 |88.9 | 87.1 | 38.7 | 89.2 | 55.8 | 72.8 | 89.8 | 78.9 | 91.3 | 26.8 | 84.4 | 40.3 | 88.9 | 81.9 | 83.1 | 34.0 | 60.1 | 83.6 | 47.3 | 59.6 | 38.8 | 67.7 |
+| Puzzle-CAM with ResNeSt-269 | 91.1 | 87.2 | 37.3 | 86.8 | 61.4 | 71.2 | 92.2 | 86.2 | 91.8 | 28.6 | 85.0 | 64.1 | 91.8 | 82.0 | 82.5 | 70.7 | 69.4 | 87.7 | 45.4 | 67.0 | 37.7 | 72.2 |
+
 <br>
 
 For any issues, please contact <b>Sanghyun Jo</b>, josanghyeokn@gmail.com
