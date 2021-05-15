@@ -110,7 +110,7 @@ class VOC_Dataset_For_Segmentation(VOC_Dataset):
 
         cmap_dic, _, class_names = get_color_map_dic()
         self.colors = np.asarray([cmap_dic[class_name] for class_name in class_names])
-
+    
     def __getitem__(self, index):
         image, mask = super().__getitem__(index)
 

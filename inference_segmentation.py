@@ -180,7 +180,7 @@ if __name__ == '__main__':
 
             if args.domain == 'test':
                 pred_mask = decode_from_colormap(pred_mask, dataset.colors)[..., ::-1]
-
+            
             imageio.imwrite(pred_dir + image_id + '.png', pred_mask.astype(np.uint8))
             
             sys.stdout.write('\r# Make CAM [{}/{}] = {:.2f}%'.format(step + 1, length, (step + 1) / length * 100))

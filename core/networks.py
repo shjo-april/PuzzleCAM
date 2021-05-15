@@ -58,7 +58,7 @@ class Backbone(nn.Module, ABC_Model):
             else:
                 dilation, dilated = 2, False
 
-            self.model = eval("resnest." + model_name)(pretrained=True, dilated=dilated, dilation=dilation, norm_layer=self.norm_fn)
+            self.model = eval("resnest." + model_name)(pretrained=False, dilated=dilated, dilation=dilation, norm_layer=self.norm_fn)
 
             del self.model.avgpool
             del self.model.fc

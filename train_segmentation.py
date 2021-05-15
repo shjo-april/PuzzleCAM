@@ -141,7 +141,7 @@ if __name__ == '__main__':
     val_iteration = len(train_loader)
     log_iteration = int(val_iteration * args.print_ratio)
     max_iteration = args.max_epoch * val_iteration
-
+    
     log_func('[i] log_iteration : {:,}'.format(log_iteration))
     log_func('[i] val_iteration : {:,}'.format(val_iteration))
     log_func('[i] max_iteration : {:,}'.format(max_iteration))
