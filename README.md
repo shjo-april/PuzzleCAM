@@ -5,7 +5,8 @@
 The official implementation of "Puzzle-CAM: Improved localization via matching partial and full features".
 
 ## Citation
-Please cite our paper if the code is helpful to your research. [arxiv](https://arxiv.org/abs/2101.11253)
+- Accepted to ICIP 2021
+- Please cite our paper if the code is helpful to your research. [arxiv](https://arxiv.org/abs/2101.11253)
 ```
 @article{jo2021puzzle,
   title={Puzzle-CAM: Improved localization via matching partial and full features},
