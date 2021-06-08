@@ -282,7 +282,7 @@ if __name__ == '__main__':
         return best_th, best_mIoU
     
     writer = SummaryWriter(tensorboard_dir)
-    train_iterator = Iterator(train_loader)
+    train_iterator = Iterator(train_loader)                                                          
 
     for iteration in range(max_iteration):
         images, labels = train_iterator.get()
