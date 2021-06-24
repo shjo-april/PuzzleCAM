@@ -10,7 +10,7 @@ The official implementation of "Puzzle-CAM: Improved localization via matching p
 ```
 @article{jo2021puzzle,
   title={Puzzle-CAM: Improved localization via matching partial and full features},
-  author={Jo, Sanhyun and Yu, In-Jae},
+  author={Jo, Sanghyun and Yu, In-Jae},
   journal={arXiv preprint arXiv:2101.11253},
   year={2021}
 }

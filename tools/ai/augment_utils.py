@@ -93,7 +93,7 @@ class Normalize:
         norm_image[..., 0] = (image[..., 0] / 255. - self.mean[0]) / self.std[0]
         norm_image[..., 1] = (image[..., 1] / 255. - self.mean[1]) / self.std[1]
         norm_image[..., 2] = (image[..., 2] / 255. - self.mean[2]) / self.std[2]
-
+        
         return norm_image
 
 class Normalize_For_Segmentation:
