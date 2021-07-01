@@ -13,7 +13,7 @@ parser.add_argument("--domain", default='train', type=str)
 parser.add_argument("--threshold", default=None, type=float)
 
 parser.add_argument("--predict_dir", default='', type=str)
-parser.add_argument('--gt_dir', default='../VOCtrainval_11-May-2012/SegmentationClass', type=str)
+parser.add_argument('--gt_dir', default='VOC2012/VOCdevkit/VOC2012/SegmentationClass', type=str)
 
 parser.add_argument('--logfile', default='',type=str)
 parser.add_argument('--comment', default='', type=str)

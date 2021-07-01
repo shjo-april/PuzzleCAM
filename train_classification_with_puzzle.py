@@ -36,6 +36,11 @@ from tools.ai.evaluate_utils import *
 from tools.ai.augment_utils import *
 from tools.ai.randaugment import *
 
+from datetime import datetime
+TIMESTAMP = "{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.now())
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "4,5,6,7"
+
 parser = argparse.ArgumentParser()
 
 ###############################################################################
@@ -43,12 +48,12 @@ parser = argparse.ArgumentParser()
 ###############################################################################
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=4, type=int)
-parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
+parser.add_argument('--data_dir', default='/media/ders/zhangyumin/DATASETS/dataset/newvoc/VOCdevkit/VOC2012/', type=str)
 
 ###############################################################################
 # Network
 ###############################################################################
-parser.add_argument('--architecture', default='resnet50', type=str)
+parser.add_argument('--architecture', default='resnest50', type=str)
 parser.add_argument('--mode', default='normal', type=str) # fix
 
 ###############################################################################
@@ -99,7 +104,7 @@ if __name__ == '__main__':
     log_dir = create_directory(f'./experiments/logs/')
     data_dir = create_directory(f'./experiments/data/')
     model_dir = create_directory('./experiments/models/')
-    tensorboard_dir = create_directory(f'./experiments/tensorboards/{args.tag}/')
+    tensorboard_dir = create_directory(f'./experiments/tensorboards/{args.tag}/{TIMESTAMP}/')
     
     log_path = log_dir + f'{args.tag}.txt'
     data_path = data_dir + f'{args.tag}.json'
@@ -136,7 +141,7 @@ if __name__ == '__main__':
             Transpose()
         ]
     )
-    test_transform = transforms.Compose([
+    test_transform = transforms.Compose([ #?这里做了什么图像增强
         Normalize_For_Segmentation(imagenet_mean, imagenet_std),
         Top_Left_Crop_For_Segmentation(args.image_size),
         Transpose_For_Segmentation()
@@ -148,6 +153,8 @@ if __name__ == '__main__':
     train_dataset = VOC_Dataset_For_Classification(args.data_dir, 'train_aug', train_transform)
 
     train_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', test_transform)
+    # train_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train')
+
     valid_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'val', test_transform)
     
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
@@ -168,6 +175,7 @@ if __name__ == '__main__':
     log_func('[i] log_iteration : {:,}'.format(log_iteration))
     log_func('[i] val_iteration : {:,}'.format(val_iteration))
     log_func('[i] max_iteration : {:,}'.format(max_iteration))
+    log_func('[i] batchsize : {:,}'.format(args.batch_size))
     
     ###################################################################################
     # Network
@@ -236,7 +244,7 @@ if __name__ == '__main__':
     train_meter = Average_Meter(['loss', 'class_loss', 'p_class_loss', 're_loss', 'conf_loss', 'alpha'])
     
     best_train_mIoU = -1
-    thresholds = list(np.arange(0.10, 0.50, 0.05))
+    thresholds = list(np.arange(0.10, 0.40, 0.04))
 
     def evaluate(loader):
         model.eval()

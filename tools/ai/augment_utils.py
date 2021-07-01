@@ -144,6 +144,29 @@ class Top_Left_Crop_For_Segmentation:
 
     def __call__(self, data):
         image, mask = data['image'], data['mask']
+        h, w, c = image.shape
+
+        ch = min(self.crop_size, h)
+        cw = min(self.crop_size, w)
+
+        cropped_image = np.ones(self.crop_shape, image.dtype) * self.bg_value
+        cropped_image[:ch, :cw] = image[:ch, :cw]
+        
+        cropped_mask = np.ones(self.crop_shape_for_mask, mask.dtype) * 255
+        cropped_mask[:ch, :cw] = mask[:ch, :cw]
+        data['image'] = cropped_image
+        data['mask'] = cropped_mask
+
+        return data
+class ResizeImg:
+    def __init__(self, crop_size, channels=3):
+        self.bg_value = 0
+        self.crop_size = crop_size
+        self.crop_shape = (self.crop_size, self.crop_size, channels)
+        self.crop_shape_for_mask = (self.crop_size, self.crop_size)
+
+    def __call__(self, data):
+        image, mask = np.copy(data['image']), np.copy(data['mask'])
 
         h, w, c = image.shape
 
@@ -155,9 +178,10 @@ class Top_Left_Crop_For_Segmentation:
         
         cropped_mask = np.ones(self.crop_shape_for_mask, mask.dtype) * 255
         cropped_mask[:ch, :cw] = mask[:ch, :cw]
-
-        data['image'] = cropped_image
-        data['mask'] = cropped_mask
+        image=np.resize(image,(self.crop_size,self.crop_size,3))
+        mask=np.resize(mask,(self.crop_size,self.crop_size))
+        data['image'] = image
+        data['mask'] = mask
 
         return data
 

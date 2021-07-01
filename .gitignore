@@ -11,3 +11,8 @@ results_*/
 
 CopyrightReceipt.pdf
 demo.py
+VOC2012
+nohup.out
+.gitignore
+
+.vscode/launch.json
