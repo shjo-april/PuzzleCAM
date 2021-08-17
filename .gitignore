@@ -16,3 +16,5 @@ nohup.out
 .gitignore
 
 .vscode/launch.json
+res*
+.gitignore
