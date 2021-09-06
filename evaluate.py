@@ -72,7 +72,7 @@ def compare(start,step,TP,P,T, name_list):
             TP[i].value += np.sum((gt==i)*mask)
             TP[i].release()
             
-def do_python_eval(predict_folder, gt_folder, name_list, num_cls=21):
+def do_python_eval(predict_folder, gt_folder, name_list, num_cls=21, num_cores=8):
     TP = []
     P = []
     T = []
@@ -82,12 +82,13 @@ def do_python_eval(predict_folder, gt_folder, name_list, num_cls=21):
         T.append(multiprocessing.Value('i', 0, lock=True))
     
     p_list = []
-    for i in range(1):
-        p = multiprocessing.Process(target=compare, args=(i,8,TP,P,T, name_list))
+    for i in range(num_cores):
+        p = multiprocessing.Process(target=compare, args=(i,num_cores,TP,P,T, name_list))
         p.start()
         p_list.append(p)
     for p in p_list:
         p.join()
+    
     IoU = []
     T_TP = []
     P_TP = []
