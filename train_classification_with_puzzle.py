@@ -39,7 +39,7 @@ from tools.ai.randaugment import *
 from datetime import datetime
 TIMESTAMP = "{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.now())
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "4,5,6,7"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
 parser = argparse.ArgumentParser()
 
@@ -72,7 +72,7 @@ parser.add_argument('--max_image_size', default=640, type=int)
 
 parser.add_argument('--print_ratio', default=0.1, type=float)
 
-parser.add_argument('--tag', default='', type=str)
+parser.add_argument('--tag', default='thre_fea', type=str)
 parser.add_argument('--augment', default='', type=str)
 
 # For Puzzle-CAM
@@ -168,7 +168,7 @@ if __name__ == '__main__':
     log_func('[i] test_transform is {}'.format(test_transform))
     log_func()
 
-    val_iteration = len(train_loader)
+    val_iteration = len(train_loader)*2
     log_iteration = int(val_iteration * args.print_ratio)
     max_iteration = args.max_epoch * val_iteration
 
@@ -259,6 +259,7 @@ if __name__ == '__main__':
                 labels = labels.cuda()
 
                 _, features = model(images, with_cam=True)
+                features=(features>gap_fn(features).reshape(args.batch_size,20,1,1))*1.0
                 
                 # features = resize_for_tensors(features, images.size()[-2:])
                 # gt_masks = resize_for_tensors(gt_masks, features.size()[-2:], mode='nearest')
@@ -332,6 +333,7 @@ if __name__ == '__main__':
         # Normal
         ###############################################################################
         logits, features = model(images, with_cam=True)
+        # features=(features>gap_fn(features).reshape(args.batch_size,20,1,1))*1.0
 
         ###############################################################################
         # Puzzle Module
@@ -341,6 +343,7 @@ if __name__ == '__main__':
         tiled_logits, tiled_features = model(tiled_images, with_cam=True)
         
         re_features = merge_features(tiled_features, args.num_pieces, args.batch_size)
+        # re_features=(re_features>gap_fn(re_features).reshape(args.batch_size,20,1,1))*1.0
 
         ###############################################################################
         # Losses

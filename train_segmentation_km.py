@@ -7,6 +7,7 @@ import copy
 import shutil
 import random
 import argparse
+from cv2 import LMEDS, log
 import numpy as np
 
 import torch
@@ -17,7 +18,7 @@ from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
 
 from torch.utils.data import DataLoader
-
+from imageio import imsave
 from core.networks import *
 from core.datasets import *
 
@@ -34,8 +35,18 @@ from tools.ai.evaluate_utils import *
 from tools.ai.augment_utils import *
 from tools.ai.randaugment import *
 from datetime import datetime
+
+BASE_DIR = r"/media/ders/zhangyumin/SPML"
+sys.path.append(BASE_DIR)
+sys.path.append(r"/media/ders/zhangyumin/superpixel_fcn")
+from  spml.utils.segsort.common import kmeans,generate_location_features,kmeans_with_initial_labels,initialize_cluster_labels,calculate_prototypes_from_labels
+
+import spml.utils.general.common as common_utils
+
+from train_util import  get_spixel_image
+
 TIMESTAMP = "{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.now())
-os.environ["CUDA_VISIBLE_DEVICES"] = "4,5,6,7"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,4,5,6"
 
 parser = argparse.ArgumentParser()
 
@@ -65,12 +76,12 @@ parser.add_argument('--wd', default=4e-5, type=float)
 parser.add_argument('--nesterov', default=True, type=str2bool)
 
 parser.add_argument('--image_size', default=512, type=int)
-parser.add_argument('--min_image_size', default=256, type=int)
-parser.add_argument('--max_image_size', default=1024, type=int)
+parser.add_argument('--min_image_size', default=384, type=int)
+parser.add_argument('--max_image_size', default=512, type=int)
 
 parser.add_argument('--print_ratio', default=0.1, type=float)
 
-parser.add_argument('--tag', default='train_seg_for_mutinet_halff', type=str)
+parser.add_argument('--tag', default='train_kmeans3', type=str)
 
 parser.add_argument('--label_name', default='AffinityNet@Rresnest269@Puzzle@train@beta=10@exp_times=8@rw@crf=0@color', type=str)
 
@@ -128,9 +139,13 @@ if __name__ == '__main__':
     
     meta_dic = read_json('./data/VOC_2012.json')
     class_names = np.asarray(meta_dic['class_names'])
+
+
     
-    train_dataset = VOC_Dataset_For_WSSS(args.data_dir, 'train_1_2_f', pred_dir, train_transform)
-    valid_dataset = VOC_Dataset_For_Segmentation(args.data_dir, 'val', test_transform)
+    # train_dataset = VOC_Dataset_For_WSSS(args.data_dir, 'train_aug', 'VOC2012/VOCdevkit/VOC2012/saliency_map/', train_transform)
+    train_dataset = VOC_Dataset_For_MNSS(
+        args.data_dir, 'VOC2012/VOCdevkit/VOC2012/saliency_map/' ,'train_aug',train_transform)
+    valid_dataset = VOC_Dataset_For_Segmentation(args.data_dir, 'train', test_transform)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
     valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, shuffle=False, drop_last=True)
@@ -214,7 +229,7 @@ if __name__ == '__main__':
     train_timer = Timer()
     eval_timer = Timer()
 
-    train_meter = Average_Meter(['loss'])
+    train_meter = Average_Meter(['loss','km_loss'])
 
     best_valid_mIoU = -1
 
@@ -273,14 +288,102 @@ if __name__ == '__main__':
     torch.autograd.set_detect_anomaly(True)
 
     for iteration in range(max_iteration):
-        images, labels = train_iterator.get()
-        images, labels = images.cuda(), labels.cuda()
-        
+        images, imgids,labels,masks,sailencys= train_iterator.get()
+        images = images.cuda()
+        labels = labels.cuda()
+        sailencys = sailencys.cuda().view(sailencys.shape[0],1,sailencys.shape[1],sailencys.shape[2])
         #################################################################################################
         # Inference
         #################################################################################################
         logits = model(images)
+        preds=F.softmax(logits,0)#
 
+        N, C ,H,W= images.shape
+        label_map_fg = labels.view(N, 21, 1, 1).expand(size=(N, 21, H, W)).bool()
+        # label_map_bg = ~ label_map_fg
+        fg_map = torch.zeros_like(preds).cuda()
+
+        fg_map[label_map_fg] = preds[label_map_fg]
+
+        fg_map = torch.sum(fg_map, dim=1, keepdim=True)
+
+        sal_pred = fg_map 
+        bin_mask=torch.ones(sal_pred.size(),dtype=torch.float).cuda()
+
+
+        # feats=torch.cat([images,sailencys],dim=1)
+        feats=images
+        feats= feats.transpose(1,3).transpose(1,2)
+
+        preds= preds.transpose(1,3).transpose(1,2)
+        logits= logits.transpose(1,3).transpose(1,2)
+
+        sailencys= sailencys.transpose(1,3).transpose(1,2)/255.0
+        N, H,W,C = feats.shape
+
+        log_like=[]
+        for i in range(N):
+            with torch.no_grad():
+                local_features = generate_location_features(
+                    (H, W), 0,feature_type='float')
+                local_features -= 0.5
+                local_features = local_features.view(1, H, W, 2).expand(args.batch_size, H, W, 2)
+                cur_embeddings = feats[i].view(-1, C)
+                cur_local_features = (
+                local_features[i].view(-1, local_features.shape[-1]))
+                cur_embeddings_with_loc = torch.cat(
+                    [cur_embeddings, cur_local_features], -1)
+                cur_embeddings_with_loc = normalize_embedding(
+                    cur_embeddings_with_loc)
+                cur_embeddings_with_loc=torch.cat([cur_embeddings_with_loc,1.5*sailencys[i].view(-1,1)],dim=1)
+
+                labels22 = initialize_cluster_labels([12,12], [H,W],0)
+                res = kmeans_with_initial_labels(  # cur_cluster_indices max:35 min:0  shape: torch.Size([14976]) 聚类算法
+                    cur_embeddings_with_loc,
+                    labels22.view(-1),#cur_cluster_indices.cpu().numpy()
+                    None,
+                    16)
+                mean_values = torch.tensor( [0.485, 0.456, 0.406]).view(3, 1, 1).cuda()
+                spixel_viz, spixel_label_map = get_spixel_image((images[i]/5 + mean_values).clamp(0, 1), res.view(H,W).squeeze(), n_spixels= 256,  b_enforce_connect=True)
+                # spixl_save_name = os.path.join('experiments/res/spxiel_viz/',   imgids[i] +'_sPixel.png')
+                # cv2.imwrite(spixl_save_name,spixel_viz.transpose(1, 2, 0)*255)
+                        
+            embeddings_512= torch.cat([preds[i],2*sailencys[i]],dim=2)
+            label_map_512=torch.from_numpy(spixel_label_map).cuda()
+            protos_200=calculate_prototypes_from_labels(embeddings_512,label_map_512)#protos.detach().cpu().numpy()[:,21]
+            labels_init = initialize_cluster_labels([1,2], [1,protos_200.shape[0]],0)
+            label_map_200 = kmeans_with_initial_labels( 
+                    protos_200,
+                    labels_init.view(-1),#protos_200.detach().cpu().numpy()[0].sum()
+                    None,
+                    16)
+            
+            new_w=preds[i]
+            new_w= normalize_embedding(
+                    new_w)
+            protos_200=calculate_prototypes_from_labels(new_w,label_map_512)#protos.detach().cpu().numpy()[:,21]
+            protos_bin2=calculate_prototypes_from_labels(protos_200,label_map_200)#protos.detach().cpu().numpy()[:,21]
+            e_protos = protos_200.view(-1, protos_200.shape[-1])
+            binres_protos = protos_bin2.view(-1, protos_bin2.shape[-1])#shape: torch.Size([602, 64]) 每个类的平均维数向量？
+            similarities = (torch.mm(e_protos, binres_protos.t()) #if input is a (n \times m)(n×m) tensor, mat2 is a (m \times p)(m×p) tensor, out will be a (n \times p)(n×p) tensor.
+                                .mul_(6) #shape: shape: torch.Size([232, 2]) 应该是每个超像素点与两个个最区域的相似度
+                                .exp_())
+
+            # Extract pixel to self prototype similarities.
+            semantic_labels=label_map_200.view(-1, 1)
+            prototype_semantic_labels = torch.tensor([0,1]).long().view(1, -1).cuda() #shape: torch.Size([1, 602]) #每个最小块都属于一个类别
+            pixel_to_prototype_similarities = torch.gather(similarities, 1, semantic_labels) #shape: torch.Size([232, 1]),和自己区域的相似度
+            
+            numerator = pixel_to_prototype_similarities
+            # numerator=1
+            diff_semantic_array = torch.ne(semantic_labels, prototype_semantic_labels).float()#shape: torch.Size([232, 2]),没个超像素和哪个区域相似
+            diff_semantic_similarities = torch.sum(
+                similarities * diff_semantic_array, 1, keepdim=True)
+            denominator = diff_semantic_similarities.add_(numerator)#C+和C-
+            log_likelihood = (numerator / denominator).log_().mul_(-1)
+            log_like.append(log_likelihood)
+        log_like=torch.cat(log_like)
+        km_loss=torch.mean(log_like)
         ###############################################################################
         # The part is to calculate losses.
         ###############################################################################
@@ -289,8 +392,10 @@ if __name__ == '__main__':
             labels = labels.type(torch.LongTensor).cuda()
 
             # print(labels.size(), labels.min(), labels.max())
+        loss=3*class_loss+km_loss
+        # loss = class_loss_fn(bin_logits, bin_mask)
 
-        loss = class_loss_fn(logits, labels)
+        # loss=torch.tensor(0)
         #################################################################################################
         
         optimizer.zero_grad()
@@ -298,20 +403,22 @@ if __name__ == '__main__':
         optimizer.step()
 
         train_meter.add({
-            'loss' : loss.item(), 
+            'loss' : class_loss.item(), 
+            'km_loss' : km_loss.item(), 
         })
         
         #################################################################################################
         # For Log
         #################################################################################################
         if (iteration + 1) % log_iteration == 0:
-            loss = train_meter.get(clear=True)
+            loss,km_loss = train_meter.get(clear=True)
             learning_rate = float(get_learning_rate_from_optimizer(optimizer))
             
             data = {
                 'iteration' : iteration + 1,
                 'learning_rate' : learning_rate,
                 'loss' : loss,
+                'km_loss' : km_loss, 
                 'time' : train_timer.tok(clear=True),
             }
             data_dic['train'].append(data)
@@ -321,16 +428,16 @@ if __name__ == '__main__':
                 iteration={iteration:,}, \
                 learning_rate={learning_rate:.4f}, \
                 loss={loss:.4f}, \
+                km_loss={km_loss:.4f}, \
                 time={time:.0f}sec'.format(**data)
             )
 
             writer.add_scalar('Train/loss', loss, iteration)
             writer.add_scalar('Train/learning_rate', learning_rate, iteration)
-        
         #################################################################################################
         # Evaluation
         #################################################################################################
-        if (iteration + 1) % val_iteration == 0:
+        if (iteration + 1) % int(val_iteration/2) == 0:
             mIoU, _ = evaluate(valid_loader)
 
             if best_valid_mIoU == -1 or best_valid_mIoU < mIoU:

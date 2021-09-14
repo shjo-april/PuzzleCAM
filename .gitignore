@@ -18,3 +18,4 @@ nohup.out
 .vscode/launch.json
 res*
 .gitignore
+res/figure_1*

@@ -8,17 +8,17 @@ import multiprocessing
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--experiment_name', default='resnet50@seed=0@nesterov@train@bg=0.20@scale=0.5,1.0,1.5,2.0@png', type=str)
-parser.add_argument("--domain", default='train', type=str)
+parser.add_argument('--experiment_name', default='train_seg_for_mutinet@val@scale=0.5,1.0,1.5,2.0@iteration=0', type=str)
+parser.add_argument("--domain", default='val', type=str)
 parser.add_argument("--threshold", default=None, type=float)
 
 parser.add_argument("--predict_dir", default='', type=str)
-parser.add_argument('--gt_dir', default='VOC2012/VOCdevkit/VOC2012/SegmentationClass', type=str)
+parser.add_argument('--gt_dir', default='VOC2012/VOCdevkit/VOC2012/SegmentationClassAug', type=str)
 
 parser.add_argument('--logfile', default='',type=str)
 parser.add_argument('--comment', default='', type=str)
 
-parser.add_argument('--mode', default='npy', type=str) # png
+parser.add_argument('--mode', default='png', type=str) # png
 parser.add_argument('--max_th', default=0.50, type=float)
 
 args = parser.parse_args()
@@ -82,12 +82,13 @@ def do_python_eval(predict_folder, gt_folder, name_list, num_cls=21):
         T.append(multiprocessing.Value('i', 0, lock=True))
     
     p_list = []
-    for i in range(1):
+    for i in range(8):
         p = multiprocessing.Process(target=compare, args=(i,8,TP,P,T, name_list))
         p.start()
         p_list.append(p)
     for p in p_list:
         p.join()
+   
     IoU = []
     T_TP = []
     P_TP = []

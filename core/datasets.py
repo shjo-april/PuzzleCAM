@@ -1,6 +1,7 @@
 import os
 import cv2
 import glob
+from numpy.core.fromnumeric import size
 import torch
 
 import math
@@ -43,7 +44,10 @@ class VOC_Dataset(torch.utils.data.Dataset):
         self.xml_dir = self.root_dir + 'Annotations/'
         self.mask_dir = self.root_dir + 'SegmentationClass/'
         
-        self.image_id_list = [image_id.strip() for image_id in open('./data/%s.txt'%domain).readlines()]
+        if(type(domain)==str):
+            self.image_id_list = [image_id.strip() for image_id in open('./data/%s.txt'%domain).readlines()]
+        else:
+             self.image_id_list=domain
         
         self.with_id = with_id
         self.with_tags = with_tags
@@ -164,6 +168,39 @@ class VOC_Dataset_For_WSSS(VOC_Dataset):
             mask = output_dic['mask']
         
         return image, mask
+
+class VOC_Dataset_For_MNSS(VOC_Dataset):
+    def __init__(self, root_dir, pse_dir, domain, transform=None):
+        super().__init__(root_dir, domain, with_id=True, with_tags=True)
+        self.transform = transform
+        self.pse_dir = pse_dir
+        cmap_dic, _, class_names = get_color_map_dic()
+        self.colors = np.asarray([cmap_dic[class_name] for class_name in class_names])
+                
+        data = read_json('./data/VOC_2012.json')
+        self.class_dic = data['class_dic']
+        self.classes = data['classes']
+
+    def __getitem__(self, index):
+        image, image_id ,tags= super().__getitem__(index)
+        size = image.size
+        pse_mask = Image.open(self.pse_dir + image_id + '.png')
+        if self.transform is not None:
+            # input_dic = {'image':image, 'mask':mask}
+            input_dic2 = {'image':image, 'mask':pse_mask}
+
+            # output_dic = self.transform(input_dic)
+            # mask = output_dic['mask']
+            output_dic = self.transform(input_dic2)
+            image = output_dic['image']
+
+            # image = output_dic['image']
+
+
+            pse_mask=output_dic['mask']
+        label = one_hot_embedding([self.class_dic[tag]+1 for tag in tags], self.classes+1)
+        label[0]=1
+        return image, image_id, label, pse_mask,pse_mask
 
 class VOC_Dataset_For_Testing_CAM(VOC_Dataset):
     def __init__(self, root_dir, domain, transform=None):

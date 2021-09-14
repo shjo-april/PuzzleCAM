@@ -35,18 +35,18 @@ from tools.ai.augment_utils import *
 from tools.ai.randaugment import *
 
 parser = argparse.ArgumentParser()
-
+os.environ["CUDA_VISIBLE_DEVICES"] = "1,0,5,6"
 ###############################################################################
 # Dataset
 ###############################################################################
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=8, type=int)
-parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
+parser.add_argument('--data_dir', default='/media/ders/zhangyumin/DATASETS/dataset/newvoc/VOCdevkit/VOC2012/', type=str)
 
 ###############################################################################
 # Network
 ###############################################################################
-parser.add_argument('--architecture', default='resnet50', type=str)
+parser.add_argument('--architecture', default='resnest50', type=str)
 parser.add_argument('--mode', default='normal', type=str) # fix
 
 ###############################################################################
@@ -65,7 +65,7 @@ parser.add_argument('--max_image_size', default=640, type=int)
 
 parser.add_argument('--print_ratio', default=0.1, type=float)
 
-parser.add_argument('--tag', default='', type=str)
+parser.add_argument('--tag', default='train_without_pretrain', type=str)
 parser.add_argument('--augment', default='', type=str)
 
 if __name__ == '__main__':

@@ -8,6 +8,27 @@ import torch.nn.functional as F
 
 from torch.optim.lr_scheduler import LambdaLR
 
+def normalize_embedding(embeddings, eps=1e-12):
+  """Normalizes embedding by L2 norm.
+
+  This function is used to normalize embedding so that the
+  embedding features lie on a unit hypersphere.
+
+  Args:
+    embeddings: An N-D float tensor with feature embedding in
+      the last dimension.
+
+  Returns:
+    An N-D float tensor with the same shape as input embedding
+    with feature embedding normalized by L2 norm in the last
+    dimension.
+  """
+  norm = torch.norm(embeddings, dim=-1, keepdim=True)
+  norm = torch.where(torch.ge(norm, eps),
+                     norm,
+                     torch.ones_like(norm).mul_(eps))
+  return embeddings / norm
+  
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)

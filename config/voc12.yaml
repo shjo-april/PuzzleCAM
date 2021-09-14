@@ -1,0 +1,33 @@
+# EXP:
+tag: testformuti
+print_ratio: 0.2
+
+# DATASET:
+data_dir: VOC2012/VOCdevkit/VOC2012/
+num_workers: 4
+pselabel_path: experiments/predictions/AffinityNet@Rresnest269@Puzzle@train@beta=10@exp_times=8@rw@crf=0@color/
+
+
+
+# IMAGE:
+image_size: 512
+min_image_size: 256
+max_image_size: 1024
+
+# MODEL:
+architecture: DeepLabv3+
+backbone: resnest50
+mode: fix
+use_gn: True
+init_modelA: experiments/models/testformuti/best_A_066.910.pth
+init_modelB: experiments/models/train_seg_for_mutinet_halfb.pth
+
+# HYPARA:
+batch_size: 32
+max_epoch: 20
+lr: 0.003
+wd: 4e-5
+nesterov: True
+OPTIMIZER: sgd
+POLY_POWER: 0.9
+WEIGHT_DECAY: 5.0e-4

@@ -44,20 +44,20 @@ parser = argparse.ArgumentParser()
 ###############################################################################
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=4, type=int)
-parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
+parser.add_argument('--data_dir', default='/media/ders/zhangyumin/DATASETS/dataset/newvoc/VOCdevkit/VOC2012/', type=str)
 
 ###############################################################################
 # Network
 ###############################################################################
 parser.add_argument('--architecture', default='DeepLabv3+', type=str)
-parser.add_argument('--backbone', default='resnest101', type=str)
+parser.add_argument('--backbone', default='resnest50', type=str)
 parser.add_argument('--mode', default='fix', type=str)
 parser.add_argument('--use_gn', default=True, type=str2bool)
 
 ###############################################################################
 # Inference parameters
 ###############################################################################
-parser.add_argument('--tag', default='', type=str)
+parser.add_argument('--tag', default='train_pseOfintera', type=str)
 
 parser.add_argument('--domain', default='val', type=str)
 
