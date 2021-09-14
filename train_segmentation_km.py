@@ -11,6 +11,7 @@ from cv2 import LMEDS, log
 import numpy as np
 
 import torch
+from torch import tensor
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -296,19 +297,19 @@ if __name__ == '__main__':
         # Inference
         #################################################################################################
         logits = model(images)
-        preds=F.softmax(logits,0)#
+        preds=F.softmax(logits,1)# preds[0,:,0,0]
 
         N, C ,H,W= images.shape
-        label_map_fg = labels.view(N, 21, 1, 1).expand(size=(N, 21, H, W)).bool()
-        # label_map_bg = ~ label_map_fg
-        fg_map = torch.zeros_like(preds).cuda()
+        # label_map_fg = labels.view(N, 21, 1, 1).expand(size=(N, 21, H, W)).bool()
+        # # label_map_bg = ~ label_map_fg
+        # fg_map = torch.zeros_like(preds).cuda()
 
-        fg_map[label_map_fg] = preds[label_map_fg]
+        # fg_map[label_map_fg] = preds[label_map_fg]
 
-        fg_map = torch.sum(fg_map, dim=1, keepdim=True)
+        # fg_map = torch.sum(fg_map, dim=1, keepdim=True)
 
-        sal_pred = fg_map 
-        bin_mask=torch.ones(sal_pred.size(),dtype=torch.float).cuda()
+        # sal_pred = fg_map 
+        # bin_mask=torch.ones(sal_pred.size(),dtype=torch.float).cuda()
 
 
         # feats=torch.cat([images,sailencys],dim=1)
@@ -321,7 +322,7 @@ if __name__ == '__main__':
         sailencys= sailencys.transpose(1,3).transpose(1,2)/255.0
         N, H,W,C = feats.shape
 
-        log_like=[]
+        class_loss_list=[]
         for i in range(N):
             with torch.no_grad():
                 local_features = generate_location_features(
@@ -348,42 +349,47 @@ if __name__ == '__main__':
                 # spixl_save_name = os.path.join('experiments/res/spxiel_viz/',   imgids[i] +'_sPixel.png')
                 # cv2.imwrite(spixl_save_name,spixel_viz.transpose(1, 2, 0)*255)
                         
-            embeddings_512= torch.cat([preds[i],2*sailencys[i]],dim=2)
-            label_map_512=torch.from_numpy(spixel_label_map).cuda()
-            protos_200=calculate_prototypes_from_labels(embeddings_512,label_map_512)#protos.detach().cpu().numpy()[:,21]
-            labels_init = initialize_cluster_labels([1,2], [1,protos_200.shape[0]],0)
-            label_map_200 = kmeans_with_initial_labels( 
-                    protos_200,
-                    labels_init.view(-1),#protos_200.detach().cpu().numpy()[0].sum()
-                    None,
-                    16)
+                embeddings_512= torch.cat([preds[i],5*sailencys[i]],dim=2)#
+                label_map_512=torch.from_numpy(spixel_label_map).cuda() 
+                protos_200_salient=calculate_prototypes_from_labels(embeddings_512,label_map_512)#sailencys[i]..cpu().numpy()[:,21]
+                labels_init = initialize_cluster_labels([1,2], [1,protos_200_salient.shape[0]],0)
+                label_map_200 = kmeans_with_initial_labels( 
+                        protos_200_salient,
+                        labels_init.view(-1),#protos_200.detach().cpu().numpy()[0].sum()
+                        None,
+                        16)
             
             new_w=preds[i]
-            new_w= normalize_embedding(
-                    new_w)
-            protos_200=calculate_prototypes_from_labels(new_w,label_map_512)#protos.detach().cpu().numpy()[:,21]
-            protos_bin2=calculate_prototypes_from_labels(protos_200,label_map_200)#protos.detach().cpu().numpy()[:,21]
-            e_protos = protos_200.view(-1, protos_200.shape[-1])
-            binres_protos = protos_bin2.view(-1, protos_bin2.shape[-1])#shape: torch.Size([602, 64]) 每个类的平均维数向量？
-            similarities = (torch.mm(e_protos, binres_protos.t()) #if input is a (n \times m)(n×m) tensor, mat2 is a (m \times p)(m×p) tensor, out will be a (n \times p)(n×p) tensor.
-                                .mul_(6) #shape: shape: torch.Size([232, 2]) 应该是每个超像素点与两个个最区域的相似度
-                                .exp_())
-
-            # Extract pixel to self prototype similarities.
-            semantic_labels=label_map_200.view(-1, 1)
-            prototype_semantic_labels = torch.tensor([0,1]).long().view(1, -1).cuda() #shape: torch.Size([1, 602]) #每个最小块都属于一个类别
-            pixel_to_prototype_similarities = torch.gather(similarities, 1, semantic_labels) #shape: torch.Size([232, 1]),和自己区域的相似度
+            # new_w= normalize_embedding( # np.unique(torch.argmax(logits[i],dim=2).detach().cpu().numpy().count(1))
+            protos_200=calculate_prototypes_from_labels(new_w,label_map_512)#label_map_200.detach().cpu().numpy()[:,21]
+            protos_bin=calculate_prototypes_from_labels(protos_200,label_map_200)#ng_c.detach().cpu().numpy()[72]
+            protos_bin_saient=calculate_prototypes_from_labels(protos_200_salient,label_map_200)
+            fg_mask =  labels[i].bool()
+            ne_mask=~fg_mask
+            fg_mask[0]=False
+            bg_mask=labels[i].bool()
+            bg_mask=torch.zeros(fg_mask.shape).bool().cuda()
+            bg_mask[0]=True
+            fg_mask=fg_mask.expand(size=(protos_200.shape[0],21)).bool()
+            fg_c=torch.sum(fg_mask*protos_200,dim=1)
+            ng_c=torch.sum(ne_mask*protos_200,dim=1)
+            bg_c=torch.sum(bg_mask*protos_200,dim=1)
+            # chanel=torch.stack([fg_c,ng_c,bg_c],dim=0)
+            chanel = fg_c+0.5*(1-bg_c)
+            label33=label_map_200.clone()
+            if(protos_bin_saient[0][21]>protos_bin_saient[1][21]) : 
+                label33[label_map_200==0]=1
+                label33[label_map_200==1]=0
+            else:
+                label33[label_map_200==0]=0
+                label33[label_map_200==1]=1
+            loss_c=F.mse_loss(chanel,label33.float())
+            class_loss_list.append(loss_c)
             
-            numerator = pixel_to_prototype_similarities
-            # numerator=1
-            diff_semantic_array = torch.ne(semantic_labels, prototype_semantic_labels).float()#shape: torch.Size([232, 2]),没个超像素和哪个区域相似
-            diff_semantic_similarities = torch.sum(
-                similarities * diff_semantic_array, 1, keepdim=True)
-            denominator = diff_semantic_similarities.add_(numerator)#C+和C-
-            log_likelihood = (numerator / denominator).log_().mul_(-1)
-            log_like.append(log_likelihood)
-        log_like=torch.cat(log_like)
-        km_loss=torch.mean(log_like)
+
+            pass
+           
+        class_loss =torch.mean(torch.stack(class_loss_list))
         ###############################################################################
         # The part is to calculate losses.
         ###############################################################################
@@ -392,7 +398,8 @@ if __name__ == '__main__':
             labels = labels.type(torch.LongTensor).cuda()
 
             # print(labels.size(), labels.min(), labels.max())
-        loss=3*class_loss+km_loss
+        km_loss=class_loss
+        loss= class_loss
         # loss = class_loss_fn(bin_logits, bin_mask)
 
         # loss=torch.tensor(0)
