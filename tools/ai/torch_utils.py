@@ -28,6 +28,49 @@ def normalize_embedding(embeddings, eps=1e-12):
                      norm,
                      torch.ones_like(norm).mul_(eps))
   return embeddings / norm
+def calculate_prototypes_from_labels(embeddings,
+                                     labels,
+                                     max_label=None,with_norm=True):
+  """Calculates prototypes from labels.
+
+  This function calculates prototypes (mean direction) from embedding
+  features for each label. This function is also used as the m-step in
+  k-means clustering.
+
+  Args:
+    embeddings: A 2-D or 4-D float tensor with feature embedding in the
+      last dimension (embedding_dim).
+    labels: An N-D long label map for each embedding pixel.
+    max_label: The maximum value of the label map. Calculated on-the-fly
+      if not specified.
+
+  Returns:
+    A 2-D float tensor with shape `[num_prototypes, embedding_dim]`.
+  """
+  embeddings = embeddings.view(-1, embeddings.shape[-1])
+  label_copy= labels.clone()
+  if max_label is None:
+    max_label = labels.max() + 1
+  prototypes = torch.zeros((max_label, embeddings.shape[-1]),
+                           dtype=embeddings.dtype,
+                           device=embeddings.device)
+  labels = labels.view(-1, 1).expand(-1, embeddings.shape[-1])
+  prototypes = prototypes.scatter_add_(0, labels, embeddings)
+  if(with_norm):
+    prototypes = normalize_embedding(prototypes)
+  else:
+    nums = torch.ones(label_copy.shape,
+                           dtype=label_copy.dtype,
+                           device=label_copy.device)
+    prototypes_num = torch.zeros((prototypes.shape[0],1),
+                           dtype=embeddings.dtype,
+                           device=embeddings.device)
+
+    prototypes_num = prototypes_num.scatter_add_(0, label_copy.view(-1,1), nums.view(-1,1).float())
+    prototypes=prototypes/prototypes_num# torch.sum(prototypes,dim=1)
+
+  return prototypes
+
   
 def set_seed(seed):
     random.seed(seed)

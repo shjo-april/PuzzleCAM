@@ -184,7 +184,7 @@ class VOC_Dataset_For_MNSS(VOC_Dataset):
     def __getitem__(self, index):
         image, image_id ,tags= super().__getitem__(index)
         size = image.size
-        pse_mask = Image.open(self.pse_dir + image_id + '.png')
+        pse_mask = Image.open(self.pse_dir + image_id + '.png').convert('L')
         if self.transform is not None:
             # input_dic = {'image':image, 'mask':mask}
             input_dic2 = {'image':image, 'mask':pse_mask}
