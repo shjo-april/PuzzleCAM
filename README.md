@@ -98,14 +98,14 @@ Top: original images. Middle: ground truth. Bottom: prediction of the segmentati
 ## 6. Provide the trained weights and training logs
 
 - "experiments.zip" includes all of trained weights and training logs (Puzzle-CAM, AffinityNet, and DeepLabv3+).
-![experiments.zip](https://drive.google.com/file/d/1cmvj-ptZRYOeA7USXZ-ZmdfeaaYDBPmz/view?usp=sharing)
+[experiments.zip](https://drive.google.com/file/d/1cmvj-ptZRYOeA7USXZ-ZmdfeaaYDBPmz/view?usp=sharing)
 
 - Release the final masks by our models. 
 
 | Model                  | val | test |
 |:----------------------:|:---:|:----:|
-| DeepLabv3+ ResNeSt-101 | ![val.tgz](https://drive.google.com/file/d/1qheW6URAkOmGcVP6-kIstGNc9fSRFuNb/view?usp=sharing) | ![test.tgz](https://drive.google.com/file/d/121jfzCBMNXKCm8fdeiHSTgx_dR6DOnH2/view?usp=sharing) |
-| DeepLabv3+ ResNeSt-269 | ![val.tgz](https://drive.google.com/file/d/1y6jIK00r4g7WH4sX7akQSDGKKxuJi5AY/view?usp=sharing) | ![test.tgz](https://drive.google.com/file/d/1Kx5TOQiSXinZ6563YE0rs4bCATi39qNd/view?usp=sharing) |
+| DeepLabv3+ ResNeSt-101 | [val.tgz](https://drive.google.com/file/d/1qheW6URAkOmGcVP6-kIstGNc9fSRFuNb/view?usp=sharing) | [test.tgz](https://drive.google.com/file/d/121jfzCBMNXKCm8fdeiHSTgx_dR6DOnH2/view?usp=sharing) |
+| DeepLabv3+ ResNeSt-269 | [val.tgz](https://drive.google.com/file/d/1y6jIK00r4g7WH4sX7akQSDGKKxuJi5AY/view?usp=sharing) | [test.tgz](https://drive.google.com/file/d/1Kx5TOQiSXinZ6563YE0rs4bCATi39qNd/view?usp=sharing) |
 
 <br>
 
