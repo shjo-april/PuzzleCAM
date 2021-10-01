@@ -95,6 +95,18 @@ Top: original images. Middle: ground truth. Bottom: prediction of the segmentati
 | Puzzle-CAM with ResNeSt-101 |88.9 | 87.1 | 38.7 | 89.2 | 55.8 | 72.8 | 89.8 | 78.9 | 91.3 | 26.8 | 84.4 | 40.3 | 88.9 | 81.9 | 83.1 | 34.0 | 60.1 | 83.6 | 47.3 | 59.6 | 38.8 | 67.7 |
 | Puzzle-CAM with ResNeSt-269 | 91.1 | 87.2 | 37.3 | 86.8 | 61.4 | 71.2 | 92.2 | 86.2 | 91.8 | 28.6 | 85.0 | 64.1 | 91.8 | 82.0 | 82.5 | 70.7 | 69.4 | 87.7 | 45.4 | 67.0 | 37.7 | 72.2 |
 
+## 6. Provide the trained weights and training logs
+
+- "experiments.zip" includes all of trained weights and training logs (Puzzle-CAM, AffinityNet, and DeepLabv3+).
+![experiments.zip](https://drive.google.com/file/d/1cmvj-ptZRYOeA7USXZ-ZmdfeaaYDBPmz/view?usp=sharing)
+
+- Release the final masks by our models. 
+
+| Model                  | val | test |
+|:----------------------:|:---:|:----:|
+| DeepLabv3+ ResNeSt-101 | ![val.tgz](https://drive.google.com/file/d/1qheW6URAkOmGcVP6-kIstGNc9fSRFuNb/view?usp=sharing) | ![test.tgz](https://drive.google.com/file/d/121jfzCBMNXKCm8fdeiHSTgx_dR6DOnH2/view?usp=sharing) |
+| DeepLabv3+ ResNeSt-269 | ![val.tgz](https://drive.google.com/file/d/1y6jIK00r4g7WH4sX7akQSDGKKxuJi5AY/view?usp=sharing) | ![test.tgz](https://drive.google.com/file/d/1Kx5TOQiSXinZ6563YE0rs4bCATi39qNd/view?usp=sharing) |
+
 <br>
 
 For any issues, please contact <b>Sanghyun Jo</b>, josanghyeokn@gmail.com
