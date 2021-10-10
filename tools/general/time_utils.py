@@ -16,7 +16,8 @@ class Timer:
         self.tik()
     
     def tik(self):
-        self.start_time = time.time()
+        self.start_time = time.time() 
+
     
     def tok(self, ms = False, clear=False):
         self.end_time = time.time()

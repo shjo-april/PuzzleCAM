@@ -37,13 +37,15 @@ from tools.ai.augment_utils import *
 from tools.ai.randaugment import *
 
 parser = argparse.ArgumentParser()
+os.environ["CUDA_VISIBLE_DEVICES"] = "1,2"
+
 
 ###############################################################################
 # Dataset
 ###############################################################################
 parser.add_argument('--seed', default=0, type=int)
-parser.add_argument('--num_workers', default=8, type=int)
-parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
+parser.add_argument('--num_workers', default=32, type=int)
+parser.add_argument('--data_dir', default='/media/ders/zhangyumin/DATASETS/dataset/newvoc/VOCdevkit/VOC2012/', type=str)
 
 ###############################################################################
 # Network
@@ -54,7 +56,7 @@ parser.add_argument('--mode', default='normal', type=str)
 ###############################################################################
 # Inference parameters
 ###############################################################################
-parser.add_argument('--tag', default='', type=str)
+parser.add_argument('--tag', default='train_kmeansesp_saientcy', type=str)
 parser.add_argument('--domain', default='train', type=str)
 
 parser.add_argument('--scales', default='0.5,1.0,1.5,2.0', type=str)
@@ -96,7 +98,8 @@ if __name__ == '__main__':
     ###################################################################################
     # Network
     ###################################################################################
-    model = Classifier(args.architecture, meta_dic['classes'], mode=args.mode)
+    # model = Classifier(args.architecture, meta_dic['classes'], mode=args.mode)
+    model = DeepLabv3_Plus('resnest50', num_classes=meta_dic['classes'] + 1, mode='fix', use_group_norm=True)
 
     model = model.cuda()
     model.eval()
@@ -141,10 +144,14 @@ if __name__ == '__main__':
         images = images.cuda()
         
         # inferenece
-        _, features = model(images, with_cam=True)
+        features = model(images, with_cam=True)
+        features =features[:,1:,:,:]
+        # print(features.shape)
 
         # postprocessing
         cams = F.relu(features)
+        # cams = F.softmax(features, dim=1)
+        print(cams[0,:,0,0])
         cams = cams[0] + cams[1].flip(-1)
 
         return cams

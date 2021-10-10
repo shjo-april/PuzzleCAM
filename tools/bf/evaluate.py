@@ -8,11 +8,11 @@ import multiprocessing
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--experiment_name', default='train_seg_for_mutinet@val@scale=0.5,1.0,1.5,2.0@iteration=0', type=str)
-parser.add_argument("--domain", default='val', type=str)
+parser.add_argument('--experiment_name', default='train_kmeans66@train@scale=0.5,1.0,1.5,2.0@iteration=0@thr=0.300000', type=str)
+parser.add_argument("--domain", default='train', type=str)
 parser.add_argument("--threshold", default=None, type=float)
 
-parser.add_argument("--predict_dir", default='', type=str)
+parser.add_argument("--predict_dir", default='不要填', type=str)
 parser.add_argument('--gt_dir', default='VOC2012/VOCdevkit/VOC2012/SegmentationClassAug', type=str)
 
 parser.add_argument('--logfile', default='',type=str)

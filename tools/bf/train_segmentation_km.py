@@ -40,14 +40,14 @@ from datetime import datetime
 BASE_DIR = r"/media/ders/zhangyumin/SPML"
 sys.path.append(BASE_DIR)
 sys.path.append(r"/media/ders/zhangyumin/superpixel_fcn")
-from  spml.utils.segsort.common import kmeans,generate_location_features,kmeans_with_initial_labels,initialize_cluster_labels
+import core.resnet38d
 
-import spml.utils.general.common as common_utils
-
-from train_util import  get_spixel_image
+import models
+from loss import *
+import train_util
 
 TIMESTAMP = "{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.now())
-os.environ["CUDA_VISIBLE_DEVICES"] = "2,3,0,6"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
 parser = argparse.ArgumentParser()
 
@@ -61,7 +61,7 @@ parser.add_argument('--data_dir', default='/media/ders/zhangyumin/DATASETS/datas
 ###############################################################################
 # Network
 ###############################################################################
-parser.add_argument('--architecture', default='DeepLabv3+', type=str)
+parser.add_argument('--architecture', default='Seg_Model', type=str)
 parser.add_argument('--backbone', default='resnest50', type=str)
 parser.add_argument('--mode', default='fix', type=str)
 parser.add_argument('--use_gn', default=True, type=str2bool)
@@ -69,20 +69,20 @@ parser.add_argument('--use_gn', default=True, type=str2bool)
 ###############################################################################
 # Hyperparameter
 ###############################################################################
-parser.add_argument('--batch_size', default=32, type=int)
-parser.add_argument('--max_epoch', default=50, type=int)
+parser.add_argument('--batch_size', default=16, type=int)
+parser.add_argument('--max_epoch', default=20, type=int)
 
-parser.add_argument('--lr', default=0.007, type=float)
+parser.add_argument('--lr', default=0.01, type=float)
 parser.add_argument('--wd', default=4e-5, type=float)
 parser.add_argument('--nesterov', default=True, type=str2bool)
 
 parser.add_argument('--image_size', default=512, type=int)
-parser.add_argument('--min_image_size', default=256, type=int)
-parser.add_argument('--max_image_size', default=512, type=int)
+parser.add_argument('--min_image_size', default=320, type=int)
+parser.add_argument('--max_image_size', default=640, type=int)
 
 parser.add_argument('--print_ratio', default=0.1, type=float)
 
-parser.add_argument('--tag', default='train_kmeans66_SALImages', type=str)
+parser.add_argument('--tag', default='train_kmeansesp_saientcy_resnest50_withquforqdetach', type=str)
 
 parser.add_argument('--label_name', default='AffinityNet@Rresnest269@Puzzle@train@beta=10@exp_times=8@rw@crf=0@color', type=str)
 
@@ -145,8 +145,9 @@ if __name__ == '__main__':
     
     # train_dataset = VOC_Dataset_For_WSSS(args.data_dir, 'train_aug', 'VOC2012/VOCdevkit/VOC2012/saliency_map/', train_transform)
     train_dataset = VOC_Dataset_For_MNSS(
-        args.data_dir, 'VOC2012/VOCdevkit/VOC2012/SALImages/' ,'train_aug',train_transform)
-    valid_dataset = VOC_Dataset_For_Segmentation(args.data_dir, 'train', test_transform)
+        args.data_dir, 'VOC2012/VOCdevkit/VOC2012/saliency_map/' ,'train_aug',train_transform)
+    # valid_dataset = VOC_Dataset_For_Segmentation(args.data_dir, 'train', test_transform)
+    valid_dataset = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', test_transform)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
     valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, shuffle=False, drop_last=True)
@@ -165,6 +166,13 @@ if __name__ == '__main__':
     log_func('[i] val_iteration : {:,}'.format(val_iteration))
     log_func('[i] max_iteration : {:,}'.format(max_iteration))
     
+
+    network_data = torch.load('/media/ders/zhangyumin/superpixel_fcn/result/VOCAUG/SpixelNet1l_bn_adam_3000000epochs_epochSize6000_b32_lr5e-05_posW0.003_21_09_15_21_42/model_best.tar')
+    print("=> using pre-trained model '{}'".format(network_data['arch']))
+    Q_model = models.__dict__[network_data['arch']]( data = network_data).cuda()
+    Q_model = nn.DataParallel(Q_model)
+    Q_model.eval()
+
     ###################################################################################
     # Network
     ###################################################################################
@@ -174,8 +182,12 @@ if __name__ == '__main__':
         model = Seg_Model(args.backbone, num_classes=meta_dic['classes'] + 1)
     elif args.architecture == 'CSeg_Model':
         model = CSeg_Model(args.backbone, num_classes=meta_dic['classes'] + 1)
+    elif args.architecture == 'resnet38':
+        model =  resnet38Net(num_classes=meta_dic['classes'] + 1)
+        weights_dict = core.resnet38d.convert_mxnet_to_torch('/media/ders/zhangyumin/PuzzleCAM/experiments/models/train_kmeansesp_saientcy_resnest50.pth')
+        model.load_state_dict(weights_dict, strict=False)
 
-    param_groups = model.get_parameter_groups(None)
+    param_groups = model.get_parameter_groups()
     params = [
         {'params': param_groups[0], 'lr': args.lr, 'weight_decay': args.wd},
         {'params': param_groups[1], 'lr': 2*args.lr, 'weight_decay': 0},
@@ -185,7 +197,7 @@ if __name__ == '__main__':
     
     model = model.cuda()
     model.train()
-    # model.load_state_dict(torch.load('experiments/models/train_kmeans66.pth'))
+    model.load_state_dict(torch.load('experiments/models/train_kmeansesp_saientcy_resnest50_withquforqdetach.pth'))
 
     log_func('[i] Architecture is {}'.format(args.architecture))
     log_func('[i] Total Params: %.2fM'%(calculate_parameters(model)))
@@ -234,7 +246,7 @@ if __name__ == '__main__':
     train_meter = Average_Meter(['loss','km_loss'])
 
     best_valid_mIoU = -1
-
+    '''
     def evaluate(loader):
         model.eval()
         eval_timer.tik()
@@ -246,8 +258,13 @@ if __name__ == '__main__':
             for step, (images, labels) in enumerate(loader):
                 images = images.cuda()
                 labels = labels.cuda()
-
+ 
                 logits = model(images)
+                logits=F.softmax(logits,1)
+                output = Q_model(images)
+                logits=train_util.upfeat(logits, output, 16, 16).cuda()
+                logits[:,0,:,:]=0.3
+
                 predictions = torch.argmax(logits, dim=1)
                 
                 # for visualization
@@ -283,12 +300,90 @@ if __name__ == '__main__':
         model.train()
         
         return meter.get(clear=True)
+    '''
+    thresholds = list(np.arange(0.15, 0.25, 0.1))
+
+    def evaluate(loader):
+        model.eval()
+        eval_timer.tik()
+
+        meter_dic = {th : Calculator_For_mIoU('./data/VOC_2012.json') for th in thresholds}
+
+        with torch.no_grad():
+            length = len(loader)
+            for step, (images, labels, gt_masks) in enumerate(loader):
+                images = images.cuda()
+                labels = labels.cuda()
+
+                logits = model(images)
+                logits=F.softmax(logits,1)
+                logits= logits.narrow(1,1,20)
+                output = Q_model(images)
+                # logits=train_util.upfeat(logits, output, 16, 16).cuda()
+                # features = resize_for_tensors(features, images.size()[-2:])
+                # gt_masks = resize_for_tensors(gt_masks, features.size()[-2:], mode='nearest')
+                mask = labels.unsqueeze(2).unsqueeze(3)
+                cams = (make_cam(logits) * mask)
+                cams=train_util.upfeat(cams, output, 16, 16)
+                # cams = (make_cam(features) * mask)
+
+                # for visualization
+                if step == 0:
+                    obj_cams = cams.max(dim=1)[0]
+                    
+                    for b in range(8):
+                        image = get_numpy_from_tensor(images[b])
+                        cam = get_numpy_from_tensor(obj_cams[b])
+
+                        image = denormalize(image, imagenet_mean, imagenet_std)[..., ::-1]
+                        h, w, c = image.shape
+
+                        cam = (cam * 255).astype(np.uint8)
+                        cam = cv2.resize(cam, (w, h), interpolation=cv2.INTER_LINEAR)
+                        cam = colormap(cam)
+
+                        image = cv2.addWeighted(image, 0.5, cam, 0.5, 0)[..., ::-1]
+                        image = image.astype(np.float32) / 255.
+
+                        writer.add_image('CAM/{}'.format(b + 1), image, iteration, dataformats='HWC')
+
+                for batch_index in range(images.size()[0]):
+                    # c, h, w -> h, w, c
+                    cam = get_numpy_from_tensor(cams[batch_index]).transpose((1, 2, 0))
+                    gt_mask = get_numpy_from_tensor(gt_masks[batch_index])
+
+                    h, w, c = cam.shape
+                    gt_mask = cv2.resize(gt_mask, (w, h), interpolation=cv2.INTER_NEAREST)
+
+                    for th in thresholds:
+                        bg = np.ones_like(cam[:, :, 0]) * th
+                        pred_mask = np.argmax(np.concatenate([bg[..., np.newaxis], cam], axis=-1), axis=-1)
+
+                        meter_dic[th].add(pred_mask, gt_mask)
+
+                # break
+
+                sys.stdout.write('\r# Evaluation [{}/{}] = {:.2f}%'.format(step + 1, length, (step + 1) / length * 100))
+                sys.stdout.flush()
+        
+        print(' ')
+        model.train()
+        
+        best_th = 0.0
+        best_mIoU = 0.0
+
+        for th in thresholds:
+            mIoU, mIoU_foreground = meter_dic[th].get(clear=True)
+            if best_mIoU < mIoU:
+                best_th = th
+                best_mIoU = mIoU
+
+        return  best_mIoU,best_th
     
     writer = SummaryWriter(tensorboard_dir)
     train_iterator = Iterator(train_loader)
 
     torch.autograd.set_detect_anomaly(True)
-
     for iteration in range(max_iteration):
         images, imgids,labels,masks,sailencys= train_iterator.get()
         images = images.cuda()
@@ -297,14 +392,19 @@ if __name__ == '__main__':
         #################################################################################################
         # Inference
         #################################################################################################
+        output = Q_model(images)
+
+        prob = output.clone().cuda(1)
+
         logits = model(images)
         _, _, h, w = logits.size()
-        tagpred = F.avg_pool2d(logits, kernel_size=(h, w), padding=0)#tagpred[7]
-        loss_cls = F.multilabel_soft_margin_loss(tagpred[:, 1:].view(tagpred.size(0), -1), labels[:,1:])
-        preds=F.softmax(logits,1)# preds[0,:,0,0]
-        N, C ,H,W= images.shape
+        # sailencys = F.interpolate(sailencys, size=(h, w))
+        sailencys = train_util.poolfeat(sailencys.cuda(1), prob, 16, 16).cuda(0)
 
-        if(False):
+        tagpred = F.avg_pool2d(logits, kernel_size=(h, w), padding=0)#
+        loss_cls = F.multilabel_soft_margin_loss(tagpred[:, 1:].view(tagpred.size(0), -1), labels[:,1:])
+        N, C ,H,W= images.shape
+        if(True):
             cam=logits
             b, c, h, w = cam.size()
             sailencys = F.interpolate(sailencys.float(), size=(h, w))
@@ -322,7 +422,7 @@ if __name__ == '__main__':
             iou_saliency = (torch.round(sal_pred[:, 1:].detach()) * torch.round(sailencys)).view(b, 20, -1).sum(-1) / \
                         (torch.round(sal_pred[:, 1:].detach()) + 1e-04).view(b, 20, -1).sum(-1)
 
-            valid_channel = (iou_saliency >= 0.0).view(b, 20, 1, 1).expand(size=(b, 20, h, w))
+            valid_channel = (iou_saliency > 0.4).view(b, 20, 1, 1).expand(size=(b, 20, h, w))
             
             label_fg_valid = label_map & valid_channel
 
@@ -345,88 +445,14 @@ if __name__ == '__main__':
             km_loss =F.mse_loss(sal_pred,sailencys)
        
     
+        if(True):
+            reconstr_feat=(logits).cuda(1)
+            for i in range(1):
+                reconstr_feat = train_util.upfeat(reconstr_feat, prob, 16, 16)  #reconstr_feat.cpu().numpy()
+                reconstr_feat = train_util.poolfeat(reconstr_feat, prob, 16, 16)
+            q_loss =F.mse_loss(logits*sailencys,reconstr_feat.cuda(0)*sailencys)
 
 
-        preds= preds.transpose(1,3).transpose(1,2)
-        logits= logits.transpose(1,3).transpose(1,2)
-
-        sailencys= sailencys.transpose(1,3).transpose(1,2)
-        # N, H,W,C = feats.shape
-
-        class_loss_list=[]
-        for i in range(N):
-            with torch.no_grad():
-                local_features = generate_location_features(
-                    (H, W), 0,feature_type='float')
-                local_features -= 0.5
-                local_features = local_features.view(1, H, W, 2).expand(args.batch_size, H, W, 2)
-                cur_embeddings = images[i].view(-1, C)
-                cur_local_features = (
-                local_features[i].view(-1, local_features.shape[-1]))
-                cur_embeddings_with_loc = torch.cat(
-                    [cur_embeddings, cur_local_features], -1)
-                cur_embeddings_with_loc = normalize_embedding(
-                    cur_embeddings_with_loc)
-                cur_embeddings_with_loc=torch.cat([cur_embeddings_with_loc,1.5*sailencys[i].view(-1,1)],dim=1)
-
-                labels22 = initialize_cluster_labels([32,32], [H,W],0)
-                res = kmeans_with_initial_labels(  # cur_cluster_indices max:35 min:0  shape: torch.Size([14976]) 聚类算法
-                    cur_embeddings_with_loc,
-                    labels22.view(-1),#cur_cluster_indices.cpu().numpy()
-                    None,
-                    16)
-                mean_values = torch.tensor( [0.485, 0.456, 0.406]).view(3, 1, 1).cuda()
-                spixel_viz, spixel_label_map = get_spixel_image((images[i]/5 + mean_values).clamp(0, 1), res.view(H,W).squeeze(), n_spixels= 256,  b_enforce_connect=True)
-                # spixl_save_name = os.path.join('experiments/res/spxiel_viz/',   imgids[i] +'_sPixel.png')
-                # cv2.imwrite(spixl_save_name,spixel_viz.transpose(1, 2, 0)*255)
-                        
-                embeddings_512= torch.cat([preds[i],3*sailencys[i]],dim=2)#
-                label_map_512=torch.from_numpy(spixel_label_map).cuda() 
-                protos_200_salient=calculate_prototypes_from_labels(embeddings_512,label_map_512)#sailencys[i]..cpu().numpy()[:,21]
-                labels_init = initialize_cluster_labels([1,2], [1,protos_200_salient.shape[0]],0)
-                label_map_200 = kmeans_with_initial_labels( 
-                        protos_200_salient,
-                        labels_init.view(-1),#protos_200.detach().cpu().numpy()[0].sum()
-                        None,
-                        16)
-            if(label_map_200.max()<1):
-                continue
-            new_w=preds[i]
-            # new_w= normalize_embedding( # np.unique(protos_200_salient.().cpu().numpy().count(1))
-            protos_200=calculate_prototypes_from_labels(new_w,label_map_512,with_norm=False)#label_map_200.detach().cpu().numpy()[:,21]
-            protos_sailent=calculate_prototypes_from_labels(sailencys[i],label_map_512,with_norm=False)#label_map_200.detach().cpu().numpy()[:,21]
-           
-            # protos_bin=calculate_prototypes_from_labels(protos_200,label_map_200,with_norm=False)
-            protos_bin_saient=calculate_prototypes_from_labels(protos_200_salient,label_map_200,with_norm=False)
-            fg_mask =  labels[i].bool()
-            ne_mask=~fg_mask
-            fg_mask[0]=False
-            bg_mask=labels[i].bool()
-            bg_mask=torch.zeros(fg_mask.shape).bool().cuda()
-            bg_mask[0]=True
-            fg_mask=fg_mask.expand(size=(protos_200.shape[0],21)).bool()
-            fg_c=torch.sum(fg_mask*protos_200,dim=1)
-            ng_c=torch.sum(ne_mask*protos_200,dim=1)
-            bg_c=torch.sum(bg_mask*protos_200,dim=1)#ng_c.detach().cpu().numpy().max()>0.5
-            # chanel=torch.stack([fg_c,ng_c,bg_c],dim=0) fg_c+ng_c+bg_c  torch.sum(torch.stack([fg_c,ng_c,bg_c]),dim=0)
-            # bg_map = torch.sub(1, bg_c)
-            chanel = fg_c
-            label33=(protos_sailent>0.3).float()
-            # label_map_200=label33.clone()
-            # if(protos_bin_saient[0][21]>protos_bin_saient[1][21]) : 
-            #     label33[label_map_200==0]=1
-            #     label33[label_map_200==1]=0
-            # else:
-            #     label33[label_map_200==0]=0
-            #     label33[label_map_200==1]=1
-            label33=label33.squeeze(1).cuda().float()
-            loss_c=F.mse_loss(chanel,label33)
-            class_loss_list.append(loss_c)
-            
-
-            pass
-           
-        km_loss =torch.mean(torch.stack(class_loss_list))
         ###############################################################################
         # The part is to calculate losses.
         # ###############################################################################
@@ -435,7 +461,12 @@ if __name__ == '__main__':
         #     labels = labels.type(torch.LongTensor).cuda()
 
             # print(labels.size(), labels.min(), labels.max())
-        loss= km_loss+loss_cls
+        alpha=1
+        if(iteration<2*log_iteration):
+            alpha=0.3
+        if(iteration<5*log_iteration):
+            alpha=0.6
+        loss= km_loss+loss_cls+alpha*q_loss
         # loss= loss_cls
         # loss = class_loss_fn(bin_logits, bin_mask)
 

@@ -41,3 +41,5 @@ def get_color_map_dic():
         cmap_image[color_index * h : (color_index + 1) * h, :] = cmap[color_index]
     
     return cmap_dic, cmap_image, labels
+
+

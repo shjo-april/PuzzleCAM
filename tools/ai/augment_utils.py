@@ -1,8 +1,9 @@
 import cv2
 import random
 import numpy as np
-
 from PIL import Image
+
+from tools.dataset.copy_paste import copy_paste
 
 def convert_OpenCV_to_PIL(image):
     return Image.fromarray(image[..., ::-1])
@@ -87,7 +88,7 @@ class Normalize:
         self.std = std
 
     def __call__(self, image):
-        image = np.asarray(image)
+        image = np.asarray(image) 
         norm_image = np.empty_like(image, np.float32)
 
         norm_image[..., 0] = (image[..., 0] / 255. - self.mean[0]) / self.std[0]
@@ -95,7 +96,20 @@ class Normalize:
         norm_image[..., 2] = (image[..., 2] / 255. - self.mean[2]) / self.std[2]
         
         return norm_image
+class DeNormalize:
+    def __init__(self, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
+        self.mean = mean
+        self.std = std
 
+    def __call__(self, image):
+        image = np.asarray(image.cpu())
+        norm_image = np.empty_like(image, np.float32)
+
+        norm_image[..., 0] = (image[..., 0]*self.std[0] +self.mean[0])*255  
+        norm_image[..., 1] = (image[..., 1]*self.std[1] +self.mean[1])*255  
+        norm_image[..., 2] = (image[..., 2]*self.std[2] +self.mean[2])*255 
+        
+        return norm_image
 class Normalize_For_Segmentation:
     def __init__(self, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
         self.mean = mean
@@ -107,7 +121,13 @@ class Normalize_For_Segmentation:
         image = np.asarray(image, dtype=np.float32)
         mask = np.asarray(mask, dtype=np.int64)
 
+    #    ####fjh#
+    #     src_mask,src_image=src_choose(dir=None)
+    #     mask,image=copy_paste(src_mask,src_image,mask,image)
+    #    ########
         norm_image = np.empty_like(image, np.float32)
+
+
 
         norm_image[..., 0] = (image[..., 0] / 255. - self.mean[0]) / self.std[0]
         norm_image[..., 1] = (image[..., 1] / 255. - self.mean[1]) / self.std[1]

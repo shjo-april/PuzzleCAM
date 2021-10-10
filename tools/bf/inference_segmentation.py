@@ -10,6 +10,7 @@ import argparse
 import numpy as np
 
 import imageio
+from numpy.core.fromnumeric import take
 
 import torch
 import torch.nn as nn
@@ -36,7 +37,7 @@ from tools.ai.evaluate_utils import *
 
 from tools.ai.augment_utils import *
 from tools.ai.randaugment import *
-
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 parser = argparse.ArgumentParser()
 
 ###############################################################################
@@ -57,12 +58,13 @@ parser.add_argument('--use_gn', default=True, type=str2bool)
 ###############################################################################
 # Inference parameters
 ###############################################################################
-parser.add_argument('--tag', default='train_pseOfintera', type=str)
+parser.add_argument('--tag', default='train_kmeans66', type=str)
 
-parser.add_argument('--domain', default='val', type=str)
+parser.add_argument('--domain', default='train', type=str)
 
 parser.add_argument('--scales', default='0.5,1.0,1.5,2.0', type=str)
 parser.add_argument('--iteration', default=0, type=int)
+parser.add_argument('--thr', default=0.4, type=float)
 
 if __name__ == '__main__':
     ###################################################################################
@@ -80,6 +82,7 @@ if __name__ == '__main__':
     
     args.tag += '@scale=%s'%args.scales
     args.tag += '@iteration=%d'%args.iteration
+    args.tag += '@thr=%f'%args.thr
 
     pred_dir = create_directory('./experiments/predictions/{}/'.format(args.tag))
     
@@ -130,17 +133,16 @@ if __name__ == '__main__':
         images = images.cuda()
         
         logits = model(images)
-        logits = resize_for_tensors(logits, image_size)
-        
-        logits = logits[0] + logits[1].flip(-1)
+        logits = resize_for_tensors(logits, image_size)#torch.max(logits[0][1:])
+        logits = F.softmax(logits, dim=1)
+        logits = logits[0] + logits[1].flip(-1) #logits[:,0,0]
         logits = get_numpy_from_tensor(logits).transpose((1, 2, 0))
-        return logits
+        return logits 
 
     with torch.no_grad():
         length = len(dataset)
-        for step, (ori_image, image_id, gt_mask) in enumerate(dataset):
+        for step, (ori_image, image_id, tag,gt_mask) in enumerate(dataset):
             ori_w, ori_h = ori_image.size
-
             cams_list = []
 
             for scale in scales:
@@ -156,17 +158,35 @@ if __name__ == '__main__':
                 images = torch.stack([image, flipped_image])
 
                 cams = inference(images, (ori_h, ori_w))
+    
+
                 cams_list.append(cams)
             
             preds = np.sum(cams_list, axis=0)
-            preds = F.softmax(torch.from_numpy(preds), dim=-1).numpy()
             
             if args.iteration > 0:
                 # h, w, c -> c, h, w
                 preds = crf_inference(np.asarray(ori_image), preds.transpose((2, 0, 1)), t=args.iteration)
                 pred_mask = np.argmax(preds, axis=0)
             else:
-                pred_mask = np.argmax(preds, axis=-1)
+                # print(np.max(preds, (0, 1), keepdims=True) )
+
+                norm_cam = preds / (np.max(preds, (0, 1), keepdims=True) + 1e-5)
+                for i in range(21):
+                    if(tag[i]==0):
+                        norm_cam[:,:,i]=0
+                    else:
+                        pass
+                        # print(norm_cam[:,:,i])
+
+                norm_cam[:,:,0]=args.thr
+                # print(norm_cam)
+                # print(norm_cam[100][100][0])
+
+                # print(preds[0][0])
+                # print(preds[0])
+                pred_mask = np.argmax(norm_cam, axis=-1)
+
 
             ###############################################################################
             # cv2.imwrite('./demo.jpg', np.concatenate([np.asarray(ori_image)[..., ::-1], decode_from_colormap(pred_mask, dataset.colors)], axis=1))
