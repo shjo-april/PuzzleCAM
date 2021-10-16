@@ -3,7 +3,7 @@ import random
 import numpy as np
 from PIL import Image
 
-from tools.dataset.copy_paste import copy_paste
+
 
 def convert_OpenCV_to_PIL(image):
     return Image.fromarray(image[..., ::-1])

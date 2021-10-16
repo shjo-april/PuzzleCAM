@@ -1,4 +1,4 @@
-import evaluator
+from  evaluator_cp import *
 
 # Copyright (C) 2020 * Ltd. All rights reserved.
 # author : Sanghyeon Jo <josanghyeokn@gmail.com>
@@ -43,11 +43,11 @@ import sys
 sys.path.append(r"/media/ders/zhangyumin/superpixel_fcn")
 import models
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "6,7"
+os.environ["CUDA_VISIBLE_DEVICES"] = "7,8"
 model = Seg_Model('resnest50', num_classes=20 + 1)
 model = model.cuda()
 model.train()
-model.load_state_dict(torch.load('/media/ders/mazhiming/PCAM/experiments/model/alpha1/2021-10-04 10:44:24.pth'))
+model.load_state_dict(torch.load('/media/ders/mazhiming/PCAM/experiments/model/baseline_new_test/2021-10-14 13:18:29.pth'))
 
 # network_data = torch.load('/media/ders/zhangyumin/superpixel_fcn/result/VOCAUG/SpixelNet1l_bn_adam_3000000epochs_epochSize6000_b32_lr5e-05_posW0.003_21_09_15_21_42/model_best.tar')
 # print("=> using pre-trained model '{}'".format(network_data['arch']))
@@ -55,5 +55,7 @@ model.load_state_dict(torch.load('/media/ders/mazhiming/PCAM/experiments/model/a
 # Q_model.load_state_dict(torch.load('/media/ders/zhangyumin/PuzzleCAM/experiments/models/train_Q_relu.pth'))
 # Q_model = nn.DataParallel(Q_model)
 # Q_model.eval()
-evaluatorA=evaluator.evaluator()
-evaluatorA.evaluate(model,'/media/ders/zhangyumin/PuzzleCAM/experiments/models/train_Q_relu.pth')
+evaluatorA = evaluator('train')
+ret = evaluatorA.evaluate(model,'/media/ders/zhangyumin/PuzzleCAM/experiments/models/train_Q_relu.pth')
+print(ret[0])
+print(ret[1])

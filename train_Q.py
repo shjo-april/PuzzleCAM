@@ -46,7 +46,7 @@ import models
 TIMESTAMP = "{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.now())
 start_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3,2,6,7"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2,3,0,1"
 parser = argparse.ArgumentParser()
 
 ###############################################################################
@@ -67,7 +67,7 @@ parser.add_argument('--use_gn', default=True, type=str2bool)
 ###############################################################################
 # Hyperparameter
 ###############################################################################
-parser.add_argument('--batch_size', default=16, type=int)
+parser.add_argument('--batch_size', default=4, type=int)
 parser.add_argument('--max_epoch', default=100, type=int)
 
 parser.add_argument('--lr', default=0.0005, type=float)
@@ -80,7 +80,7 @@ parser.add_argument('--max_image_size', default=640, type=int)
 parser.add_argument('--downsize', default=16, type=int)
 parser.add_argument('--print_ratio', default=0.1, type=float)
 
-parser.add_argument('--tag', default='train_Q_relu', type=str)
+parser.add_argument('--tag', default='train_Q_relu_new', type=str)
 
 parser.add_argument('--label_name', default='AffinityNet@Rresnest269@Puzzle@train@beta=10@exp_times=8@rw@crf=0@color', type=str)
 
@@ -267,7 +267,7 @@ if __name__ == '__main__':
 
         with torch.no_grad():
             length = len(loader)
-            for step, (images, labels) in enumerate(loader):
+            for step, (images, labels) in enumerate(loader):  
                 images = images.cuda()
                 _,_,w,h= images.shape
                 labels = labels.cuda()
@@ -345,7 +345,7 @@ if __name__ == '__main__':
         images, imgids,tags,masks,sailencys= train_iterator.get()
         tags = tags.cuda()
         sailencys = sailencys.cuda().view(sailencys.shape[0],1,sailencys.shape[1],sailencys.shape[2])/255.0
-        labels =(sailencys>0.1).long()#prob[0][4].detach().min()#sailencys[0][0]
+        labels =(sailencys>0.2).long()#prob[0][4].detach().min()#sailencys[0][0]
         #################################################################################################
         # Inference
         #################################################################################################
@@ -354,16 +354,28 @@ if __name__ == '__main__':
         ###############################################################################
         # The part is to calculate losses.
         ###############################################################################
-
-            # print(labels.size(), labels.min(), labels.sum())
         label_1hot = label2one_hot_torch(labels, C=21) # set C=50 as SSN does
         LABXY_feat_tensor = build_LABXY_feat(label_1hot, XY_feat_stack)  # B* (50+2 )* H * W
-        prob[:,4]=0.9- relufn(0.9 -prob[:,4]) #prob[:,4].max()
-        relu_loss= 1/(torch.sum(prob,dim=1).mean()**2)
-
-        loss, loss_sem, loss_pos = compute_semantic_pos_loss(  prob,LABXY_feat_tensor,
+            # print(labels.size(), labels.min(), labels.sum())
+        loss =torch.tensor(0.0).cuda()
+        loss_sem =torch.tensor(0.0).cuda()
+        loss_pos =torch.tensor(0.0).cuda()
+        relu_loss =torch.tensor(1.0).cuda()
+        # prob[:,4]=0.9- relufn(0.9 -prob[:,4]) #prob[:,4].max()
+        # relu_loss= 1/(torch.sum(prob,dim=1).mean()**2)
+        for gpui in range(the_number_of_gpu):
+            curb = args.batch_size/the_number_of_gpu
+            # label_1hot_gpui = label_1hot.cuda(gpui)[int(curb*gpui):int(curb*(gpui+1))] # set C=50 as SSN does
+            LABXY_feat_tensor_gpui = LABXY_feat_tensor.cuda(gpui)[int(curb*gpui):int(curb*(gpui+1))]  # B* (50+2 )* H * W
+            prob_gpui=prob.cuda(gpui)[int(curb*gpui):int(curb*(gpui+1))] 
+            loss_guip, loss_sem_guip, loss_pos_guip = compute_semantic_pos_loss( prob_gpui,LABXY_feat_tensor_gpui,
                                                         pos_weight= 0.003, kernel_size=16)
-        loss+=relu_loss
+            loss+=loss_guip.cpu()/the_number_of_gpu 
+            loss_sem+=loss_sem_guip.cpu()/the_number_of_gpu
+            loss_pos+=loss_pos_guip.cpu()/the_number_of_gpu
+        # loss, loss_sem, loss_pos = compute_semantic_pos_loss(  prob,LABXY_feat_tensor,
+                                                        # pos_weight= 0.003, kernel_size=16)
+        # loss+=relu_loss
         # loss = class_loss_fn(logits, labels)
         #################################################################################################
         
@@ -413,7 +425,7 @@ if __name__ == '__main__':
         #################################################################################################
         # Evaluation
         #################################################################################################
-        if (iteration + 1) % val_iteration == 0:
+        if (iteration + 1) % (2*val_iteration) == 0:
             mIoU, _ = evaluate(valid_loader)
             # continue
             if best_valid_mIoU == -1 or best_valid_mIoU < mIoU:

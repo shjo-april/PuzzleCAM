@@ -9,7 +9,7 @@ sys.path.append('./third_party/cython')
 from connectivity import enforce_connectivity
 
 
-def compute_semantic_pos_loss(prob_in, labxy_feat,  pos_weight = 0.003,  kernel_size=16):
+def compute_semantic_pos_loss(prob_in, labxy_feat,  pos_weight = 0.003,  kernel_size=8):
     # this wrt the slic paper who used sqrt of (mse)
 
     # rgbxy1_feat: B*50+2*H*W
@@ -113,7 +113,6 @@ def poolfeat(input, prob, sp_h=2, sp_w=2):
         return feat_sum, prob_sum
 
     b, _, h, w = input.shape 
-    input.cpu().numpy()
     h_shift_unit = 1
     w_shift_unit = 1
     p2d = (w_shift_unit, w_shift_unit, h_shift_unit, h_shift_unit)
@@ -402,7 +401,14 @@ def label2one_hot_torch(labels, C=14):
     return target.type(torch.float32)
 
 def refine_with_q(input,prob,iter=20,down_size=16):
-    for i in range(iter):
-        input= poolfeat(input,prob,down_size,down_size)
-        input= upfeat(input,prob,down_size,down_size)
+    if(prob.shape[2]==input.shape[2]):
+        for i in range(iter):
+            input= poolfeat(input,prob,down_size,down_size)
+            input= upfeat(input,prob,down_size,down_size)
+    elif(prob.shape[2]==input.shape[2]*down_size):
+        for i in range(iter):
+            input= upfeat(input,prob,down_size,down_size)
+            input= poolfeat(input,prob,down_size,down_size)
+    else:
+        assert False, '尺寸不对'
     return input

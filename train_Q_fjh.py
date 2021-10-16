@@ -15,12 +15,13 @@ import torch.nn.functional as F
 
 from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
-
+import evaluator
+evaluatorA=evaluator.evaluator(domain='train')
 from torch.utils.data import DataLoader
 
 from core.networks import *
 from core.datasets import *
-from tools.dataset.copy_paste import  data_augment
+from tools.dataset.copy_paste import data_augment
 
 from tools.general.io_utils import *
 from tools.general.time_utils import *
@@ -45,10 +46,10 @@ import core.resnet38d
 import models
 TIMESTAMP = "{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.now())
 start_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-os.environ["CUDA_VISIBLE_DEVICES"] = "2,6,1,3,7"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2,3,1,0"
 parser = argparse.ArgumentParser()
 
-###############################################################################
+#########################################,0######################################
 # Dataset
 ###############################################################################
 parser.add_argument('--seed', default=0, type=int)
@@ -183,6 +184,7 @@ if __name__ == '__main__':
     #     {'params': param_groups[2], 'lr': 10*args.lr, 'weight_decay': args.wd},
     #     {'params': param_groups[3], 'lr': 20*args.lr, 'weight_decay': 0},
     # ]
+    
     #endregion
 
     network_data = torch.load('/media/ders/fengjinhao/superpixel_fcn-master/VOC_AUG/SpixelNet1l_bn_adam_3000000epochs_epochSize6000_b4_lr5e-05_posW0.003_21_09_29_14_19/model_best.tar')
@@ -279,41 +281,41 @@ if __name__ == '__main__':
                 inuptfeats=refine_with_q(inuptfeats,prob,20)
                 predictions =torch.argmax(inuptfeats,dim=1)
             
-                # # for visualization
-                # if step == 0|step == 1:
-                #     disp=refine_with_q(XY_feat_stack,prob,50) #
-                #     disp= disp - XY_feat_stack#get_numpy_from_tensor(rgb[0]-rgb[1])
-                #     b = abs(disp[:,0])-disp[:,0]
-                #     g = abs(disp[:,0])+disp[:,0]
-                #     r = abs(disp[:,1])
+                # for visualization
+                if step == 0|step == 1:
+                    disp=refine_with_q(XY_feat_stack,prob,50) #
+                    disp= disp - XY_feat_stack#get_numpy_from_tensor(rgb[0]-rgb[1])
+                    b = abs(disp[:,0])-disp[:,0]
+                    g = abs(disp[:,0])+disp[:,0]
+                    r = abs(disp[:,1])
                     
-                #     rgb= torch.stack([r,g,b],dim=1) 
-                #     rgb=make_cam(rgb)
-                #     mask_fg=(labels>0)
-                #     mask_fg2=(labels>0)&(labels<21)
-                #     mask_fg=mask_fg.unsqueeze(1).expand(rgb.shape)
-                #     rgb[~mask_fg]=1
-                #     rgb = 200*(1-make_cam(rgb))*mask_fg#rgb[0].cpu().numpy()rgb*mask_fg
-                #     for b in range(args.batch_size):
-                #         image = get_numpy_from_tensor(images[b])
-                #         pred_mask = get_numpy_from_tensor(labels[b])
+                    rgb= torch.stack([r,g,b],dim=1) 
+                    rgb=make_cam(rgb)
+                    mask_fg=(labels>0)
+                    mask_fg2=(labels>0)&(labels<21)
+                    mask_fg=mask_fg.unsqueeze(1).expand(rgb.shape)
+                    rgb[~mask_fg]=1
+                    rgb = 200*(1-make_cam(rgb))*mask_fg#rgb[0].cpu().numpy()rgb*mask_fg
+                    for b in range(args.batch_size):
+                        image = get_numpy_from_tensor(images[b])
+                        pred_mask = get_numpy_from_tensor(labels[b])
 
-                #         image = denormalize(image, imagenet_mean, imagenet_std)[..., ::-1]
-                #         h, w, c = image.shape
+                        image = denormalize(image, imagenet_mean, imagenet_std)[..., ::-1]
+                        h, w, c = image.shape
 
-                #         pred_mask = decode_from_colormap(pred_mask, train_dataset.colors)
-                #         pred_mask = cv2.resize(pred_mask, (w, h), interpolation=cv2.INTER_NEAREST)
+                        pred_mask = decode_from_colormap(pred_mask, train_dataset.colors)
+                        pred_mask = cv2.resize(pred_mask, (w, h), interpolation=cv2.INTER_NEAREST)
                         
-                #         image_gt = cv2.addWeighted(image, 0.5, pred_mask, 0.5, 0)[..., ::-1]
+                        image_gt = cv2.addWeighted(image, 0.5, pred_mask, 0.5, 0)[..., ::-1]
                        
-                #         disp = rgb[b].transpose(0,1).transpose(1,2)
-                #         displacement =  cv2.addWeighted(image, 0.0, get_numpy_from_tensor(disp).astype(np.uint8), 0.8, 0)[..., ::-1]
-                #         #displacement
-                #         image_gt = image_gt.astype(np.float32) / 255.
-                #         displacement = displacement.astype(np.float32) / 255.
+                        disp = rgb[b].transpose(0,1).transpose(1,2)
+                        displacement =  cv2.addWeighted(image, 0.0, get_numpy_from_tensor(disp).astype(np.uint8), 0.8, 0)[..., ::-1]
+                        #displacement
+                        image_gt = image_gt.astype(np.float32) / 255.
+                        displacement = displacement.astype(np.float32) / 255.
 
-                #         writer.add_image('Mask/{}'.format(args.batch_size*step+b + 1), image, iteration, dataformats='HWC')
-                #         writer.add_image('disp/{}'.format(args.batch_size*step+b + 1), displacement, iteration, dataformats='HWC')
+                        writer.add_image('Mask/{}'.format(args.batch_size*step+b + 1), image, iteration, dataformats='HWC')
+                        writer.add_image('disp/{}'.format(args.batch_size*step+b + 1), displacement, iteration, dataformats='HWC')
                 
                 for batch_index in range(images.size()[0]):
                     pred_mask = get_numpy_from_tensor(predictions[batch_index])
@@ -341,24 +343,43 @@ if __name__ == '__main__':
     for iteration in range(max_iteration):
         # mIoU, _ = evaluate(valid_loader) 
         images, imgids,tags,masks,sailencys= train_iterator.get() 
-        sailencys = sailencys.view(sailencys.shape[0],sailencys.shape[1],sailencys.shape[2])/255.0
-        labels =(sailencys>0.1).long()#prob[0][4].detach().min()#sailencys[0][0]
+        sailencys = sailencys.cuda().view(sailencys.shape[0],sailencys.shape[1],sailencys.shape[2])/255.0
+        labels =(sailencys>0.1).long()
+        #prob[0][4].detach().min()#sailencys[0][0]
         #################################################################################################
         #data agument fjh
         #################################################################################################
         # images=denomalize_fn(images.transpose(1,2).transpose(2,3)) 
         # images= np.around(images).astype(np.uint8)
         # sailencys=sailencys.numpy().astype(np.uint8)
-        images,labels=data_augment(images.transpose(1,2).transpose(2,3).cuda(),labels.cuda())
-        if (iteration + 1) % log_iteration == 0:
-            for i in range(args.batch_size):
-                writer.add_image('image/{}'.format(args.batch_size*iteration+i+1),  denomalize_fn(images[i]), iteration, dataformats='HWC')
-                writer.add_image( 'Mask/{}'.format(args.batch_size*iteration+i +1), sailencys[i], iteration, dataformats='HW')
+
+        # if (iteration + 1) % log_iteration == 0:
+        with torch.no_grad():
+            # images=images.transpose(1,2).transpose(2,3).cuda()
+            images,labels=data_augment(images.cuda(),labels.cuda())
+            # images,labels=data_augment(images,labels.cuda())
+            # images=images.transpose(3,2).transpose(2,1)
+        
+            tags = tags.cuda()
+            if (iteration + 1) % log_iteration == 0:
+                for i in range(args.batch_size):
+                    image = get_numpy_from_tensor(images[i])
+                    pred_mask = get_numpy_from_tensor(labels[i])
+
+                    image = denormalize(image, imagenet_mean, imagenet_std)[..., ::-1]
+                    h, w, c = image.shape
+
+                    pred_mask = decode_from_colormap(pred_mask, train_dataset.colors)
+                    # pred_mask = cv2.resize(pred_mask, (w, h), interpolation=cv2.INTER_NEAREST)
+                    
+                    image_gt = cv2.addWeighted(image, 0.5, pred_mask, 0.5, 0)[..., ::-1]
+                    image_gt = image_gt.astype(np.float32) / 255.
+                    writer.add_image('Aug_image/{}'.format(args.batch_size*iteration+i+1),  image_gt, iteration, dataformats='HWC')
+                    # writer.add_image('GT/{}'.format(args.batch_size*iteration+i+1),  pred_mask, iteration, dataformats='HWC')
+                # cv2.imwrite('experiments/demo/'+str(i)+'.png',denomalize_fn(images[i]))
         # images = torch.from_numpy(normalize_fn(images)).transpose(3,1).transpose(3,2).cuda()
         # sailencys=torch.from_numpy(sailencys).cuda()
-        images=images.transpose(3,2).transpose(2,1)
-        labels=labels.unsqueeze(1)
-        tags = tags.cuda()
+        labels=labels.unsqueeze(1).cuda()#labels.max()
    
         # sailencys = sailencys.cuda().view(sailencys.shape[0],sailencys.shape[1],sailencys.shape[2])/255.0
 
@@ -383,7 +404,7 @@ if __name__ == '__main__':
         loss+=relu_loss
         # loss = class_loss_fn(logits, labels)
         #################################################################################################
-        
+        # mIoU, _ = evaluate(valid_loader) 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -430,9 +451,13 @@ if __name__ == '__main__':
         #################################################################################################
         # Evaluation
         #################################################################################################
-        if (iteration + 1) % val_iteration == 0:
+        if (iteration + 1) % (10*val_iteration) == 0:
+            
             mIoU, _ = evaluate(valid_loader)
+            # mIoU,re_th = evaluatorA.evaluate('/media/ders/zhangyumin/PuzzleCAM/experiments/model/Q_10.10_alpha/2021-10-11 10:53:25.pth',model)
+            # refine,threshold=re_th
             # continue
+    
             if best_valid_mIoU == -1 or best_valid_mIoU < mIoU:
                 best_valid_mIoU = mIoU
 
@@ -441,6 +466,7 @@ if __name__ == '__main__':
 
             data = {
                 'iteration' : iteration + 1,
+                # 'threshold' : threshold,
                 'mIoU' : mIoU,
                 'best_valid_mIoU' : best_valid_mIoU,
                 'time' : eval_timer.tok(clear=True),
@@ -454,9 +480,11 @@ if __name__ == '__main__':
                 best_valid_mIoU={best_valid_mIoU:.2f}%, \
                 time={time:.0f}sec'.format(**data)
             )
-            
+
+            # writer.add_scalar('Evaluation/threshold', threshold, iteration)
             writer.add_scalar('Evaluation/mIoU', mIoU, iteration)
             writer.add_scalar('Evaluation/best_valid_mIoU', best_valid_mIoU, iteration)
+    
     
     write_json(data_path, data_dic)
     writer.close()

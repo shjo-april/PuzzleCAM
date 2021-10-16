@@ -1,0 +1,5 @@
+{
+    "alpha_sal":{"_type": "quniform", "_value": [0, 1.0, 0.1]},
+    "alpha_final":{"_type": "quniform", "_value": [0, 1.0, 0.1]},
+    "loss_mask":{"_type": "quniform", "_value": [0, 1.0, 0.1]}
+}

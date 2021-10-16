@@ -42,7 +42,8 @@ class VOC_Dataset(torch.utils.data.Dataset):
 
         self.image_dir = self.root_dir + 'JPEGImages/'
         self.xml_dir = self.root_dir + 'Annotations/'
-        self.mask_dir = self.root_dir + 'SegmentationClass/'
+        self.mask_dir = self.root_dir + 'SegmentationClassAug/'
+
         
         if(type(domain)==str):
             self.image_id_list = [image_id.strip() for image_id in open('./data/%s.txt'%domain).readlines()]

@@ -53,14 +53,13 @@ class evaluator:
         self.C_model = None
         self.Q_model = None
         self.proxy_Q_model =None
-        self.fast_eval =True#eval的时候会缩小尺寸，精度会有所偏差
+        self.fast_eval =False#eval的时候会缩小尺寸，精度会有所偏差
         self.first_check = (320,70.5)
 
         # self.scale_list  = [0.5,-0.5]#- is flip
         self.scale_list  = [0.5,1,1.5,2.0,-0.5,-1,-1.5,-2.0]#- is flip
-        self.scale_list  = [0.5,1,1.5,2.0]#- is flip
 
-        self.th_list = [0.25,0.3]
+        self.th_list = [0.3,0.35]
         #self.refine_list = [0]
         self.refine_list = [25,30]
 
@@ -81,8 +80,9 @@ class evaluator:
 
         self.ptsave_path=[None,None,None]
         self.save   = True
-        self.save_path='/media/ders/zhangyumin/PuzzleCAM/experiments/res/cam_test/'
-
+        self.save_path='/media/ders/zhangyumin/PuzzleCAM/experiments/res/cam_test2/'
+        if not os.path.exists(self.save_path):
+                os.mkdir(self.save_path)
         self.tag    = 'test'
         self.domain = domain
         self.meter = IOUMetric(21) 
@@ -207,6 +207,8 @@ class evaluator:
                 length = len(self.valid_loader)
                 time_list=[0,0,0]
                 good=True
+                _refine_list= self.refine_list
+                _th_list = self.th_list
                 for step, (images,image_ids, tags, gt_masks) in enumerate( self.valid_loader ):
                     images = images.cuda()
                     gt_masks = gt_masks.cuda()
@@ -227,8 +229,13 @@ class evaluator:
                     refine_cam = cams.clone()
                     mask=tags.unsqueeze(2).unsqueeze(3).cuda()
 
-                    for renum in range(len(self.refine_list)):
-                        refinetime =self.refine_list[0] if renum==0 else 5
+                    if(step==500):
+                        _refine_list =[self.getbest_miou(clear=False)[1][0]]
+                        _th_list =[self.getbest_miou(clear=False)[1][1]]
+                    if(step==1465):
+                        print(self.getbest_miou(clear=False))
+                    for renum in range(len(_refine_list)):
+                        refinetime =_refine_list[0] if renum==0 else 5
                         refine_cam= refine_with_q(refine_cam,refinQ,refinetime)
                         cams = (make_cam(refine_cam) * mask)
                         if not self.Top_Left_Crop:
@@ -236,15 +243,15 @@ class evaluator:
                             if(self.fast_eval):
                                     resc=2
                             cams = F.interpolate(cams,(int(h/resc),int(w/resc)), mode='bilinear', align_corners=False)
-                        for th in self.th_list:
+                        for th in _th_list:
                             cams[:,0]=th#predictions.max()
                             predictions=torch.argmax(cams,dim=1)
                             for batch_index in range(images.size()[0]):
                                 pred_mask = get_numpy_from_tensor(predictions[batch_index])
                                 gt_mask = get_numpy_from_tensor(gt_masks[batch_index])
                                 gt_mask=cv2.resize(gt_mask,(pred_mask.shape[1],pred_mask.shape[0]), interpolation=cv2.INTER_NEAREST)
-                                self.meterlist[self.parms.index((self.refine_list[renum],th))].add(pred_mask, gt_mask)#self.getbest_miou(clear=False)
-                                if(False):
+                                self.meterlist[self.parms.index((_refine_list[renum],th))].add(pred_mask, gt_mask)#self.getbest_miou(clear=False)
+                                if(True):
                                     if(self.C_model!=None):
                                         img_path=os.path.join(self.save_path,image_ids[batch_index]+'.png')
                                         img_pil2= Image.fromarray(pred_mask.astype(np.uint8))

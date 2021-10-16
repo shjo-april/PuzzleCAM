@@ -53,16 +53,18 @@ class evaluator:
         self.C_model = None
         self.Q_model = None
         self.proxy_Q_model =None
-        self.fast_eval =True#eval的时候会缩小尺寸，精度会有所偏差
-        self.first_check = (320,70.5)
+        self.fast_eval =False#eval的时候会缩小尺寸，精度会有所偏差
+        self.first_check = (1464,70.5)
 
         # self.scale_list  = [0.5,-0.5]#- is flip
         self.scale_list  = [0.5,1,1.5,2.0,-0.5,-1,-1.5,-2.0]#- is flip
-        self.scale_list  = [0.5,1,1.5,2.0]#- is flip
+        # self.scale_list  = [0.5,1,1.5,2.0]#- is flip
+        # self.scale_list  = [1,-1]#- is flip
 
-        self.th_list = [0.25,0.3]
-        #self.refine_list = [0]
-        self.refine_list = [25,30]
+
+        self.th_list = [0.2,0.25]
+        self.refine_list = [0]
+        #self.refine_list = [25,30]
 
         # self.th_list = [0.3]
         # self.refine_list = [20]
@@ -81,7 +83,9 @@ class evaluator:
 
         self.ptsave_path=[None,None,None]
         self.save   = True
-        self.save_path='/media/ders/zhangyumin/PuzzleCAM/experiments/res/cam_test/'
+        self.save_path='/media/ders/zhangyumin/PuzzleCAM/experiments/res/no_Q/'
+        if not os.path.exists(self.save_path):
+                            os.mkdir(self.save_path)
 
         self.tag    = 'test'
         self.domain = domain
@@ -154,7 +158,7 @@ class evaluator:
         _,_,h,w=Q_list[self.scale_list.index(1.0)].shape
         refine_cam_list=[]
         for cam,Q,s in zip(cam_list,Q_list,self.scale_list):
-                cam=upfeat(cam,Q,16,16)
+                #cam=upfeat(cam,Q,16,16)
                 cam = F.interpolate(cam,(int(h),int(w)), mode='bilinear', align_corners=False)
                 if(s<0):
                    cam = torch.flip(cam,dims=[3])#?dims 
@@ -244,7 +248,7 @@ class evaluator:
                                 gt_mask = get_numpy_from_tensor(gt_masks[batch_index])
                                 gt_mask=cv2.resize(gt_mask,(pred_mask.shape[1],pred_mask.shape[0]), interpolation=cv2.INTER_NEAREST)
                                 self.meterlist[self.parms.index((self.refine_list[renum],th))].add(pred_mask, gt_mask)#self.getbest_miou(clear=False)
-                                if(False):
+                                if(True):
                                     if(self.C_model!=None):
                                         img_path=os.path.join(self.save_path,image_ids[batch_index]+'.png')
                                         img_pil2= Image.fromarray(pred_mask.astype(np.uint8))

@@ -7,9 +7,12 @@ import copy
 import shutil
 import random
 import argparse
+from cv2 import LMEDS, log
 import numpy as np
+import datetime
 
 import torch
+from torch import tensor
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -17,13 +20,17 @@ from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
 
 from torch.utils.data import DataLoader
-
+from imageio import imsave
 from core.networks import *
 from core.datasets import *
 
 from tools.general.io_utils import *
 from tools.general.time_utils import *
 from tools.general.json_utils import *
+
+#import evaluate
+import evaluator
+evaluatorA=evaluator.evaluator(domain='train')
 
 from tools.ai.log_utils import *
 from tools.ai.demo_utils import *
@@ -34,44 +41,58 @@ from tools.ai.evaluate_utils import *
 from tools.ai.augment_utils import *
 from tools.ai.randaugment import *
 from datetime import datetime
+
+BASE_DIR = r"/media/ders/zhangyumin/SPML"
+sys.path.append(BASE_DIR)
+sys.path.append(r"/media/ders/zhangyumin/superpixel_fcn")
+import core.resnet38d
+
+#import evaluate
+#from tools.ai import evaluator
+#evaluatorA=evaluator.evaluator()
+#evaluatorA.evaluate('/media/ders/mazhiming/PCAM/experiments/model/alpha1/2021-10-04 10:44:24.pth','/media/ders/zhangyumin/PuzzleCAM/experiments/models/train_Q_relu.pth')
+import models
+from loss import *
+import train_util
+
 TIMESTAMP = "{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.now())
-start_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
 parser = argparse.ArgumentParser()
-
+start_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 ###############################################################################
 # Dataset
 ###############################################################################
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=4, type=int)
-parser.add_argument('--data_dir', default='VOC2012/VOCdevkit/VOC2012/', type=str)
+parser.add_argument('--data_dir', default='/media/ders/zhangyumin/DATASETS/dataset/newvoc/VOCdevkit/VOC2012/', type=str)
 
 ###############################################################################
 # Network
 ###############################################################################
-parser.add_argument('--architecture', default='DeepLabv3+', type=str)
-parser.add_argument('--backbone', default='resnest101', type=str)
+parser.add_argument('--architecture', default='Seg_Model', type=str)
+parser.add_argument('--backbone', default='resnest50', type=str)
 parser.add_argument('--mode', default='fix', type=str)
 parser.add_argument('--use_gn', default=True, type=str2bool)
 
 ###############################################################################
 # Hyperparameter
 ###############################################################################
-parser.add_argument('--batch_size', default=32, type=int)
-parser.add_argument('--max_epoch', default=50, type=int)
+parser.add_argument('--batch_size', default=16, type=int)
+#parser.add_argument('--batch_size', default=8, type=int)
+parser.add_argument('--max_epoch', default=20, type=int)
 
-parser.add_argument('--lr', default=0.007, type=float)
+parser.add_argument('--lr', default=0.01, type=float)
 parser.add_argument('--wd', default=4e-5, type=float)
 parser.add_argument('--nesterov', default=True, type=str2bool)
 
 parser.add_argument('--image_size', default=512, type=int)
-parser.add_argument('--min_image_size', default=256, type=int)
-parser.add_argument('--max_image_size', default=1024, type=int)
+parser.add_argument('--min_image_size', default=320, type=int)
+parser.add_argument('--max_image_size', default=640, type=int)
 
 parser.add_argument('--print_ratio', default=0.1, type=float)
 
-parser.add_argument('--tag', default='train_seg_for_sanet_eps', type=str)
+parser.add_argument('--tag', default='Q_softmax_cam', type=str)
 
 parser.add_argument('--label_name', default='AffinityNet@Rresnest269@Puzzle@train@beta=10@exp_times=8@rw@crf=0@color', type=str)
 
@@ -85,8 +106,11 @@ if __name__ == '__main__':
     data_dir = create_directory(f'./experiments/data/')
     model_dir = create_directory('./experiments/models/')
     tensorboard_dir = create_directory(f'./experiments/tensorboards/{args.tag}/{TIMESTAMP}/')   
-    # pred_dir = './experiments/predictions/{}/'.format(args.label_name)
-    pred_dir ='/media/ders/zhangyumin/EPS-1/result/voc12_eps_pret/result/cam_png_aug/'
+    pred_dir = './experiments/predictions/{}/'.format(args.label_name)
+
+    # log_path = log_dir + f'{args.tag}{start_time}.txt'
+    # data_path = data_dir + f'{args.tag}{start_time}.json'
+    # model_path = model_dir + f'{args.tag}{start_time}.pth'
     log_tag=create_directory(f'./experiments/logs/{args.tag}/')
     data_tag=create_directory(f'./experiments/data/{args.tag}/')
     model_tag=create_directory(f'./experiments/model/{args.tag}/')
@@ -94,6 +118,7 @@ if __name__ == '__main__':
     log_path = log_tag+ f'/{start_time}.txt'
     data_path = data_tag + f'/{start_time}.json'
     model_path = model_tag + f'/{start_time}.pth'
+    
     set_seed(args.seed)
     log_func = lambda string='': log_print(string, log_path)
     
@@ -132,9 +157,14 @@ if __name__ == '__main__':
     
     meta_dic = read_json('./data/VOC_2012.json')
     class_names = np.asarray(meta_dic['class_names'])
+
+
     
-    train_dataset = VOC_Dataset_For_WSSS(args.data_dir, 'train_aug', pred_dir, train_transform)
-    valid_dataset = VOC_Dataset_For_Segmentation(args.data_dir, 'val', test_transform)
+    # train_dataset = VOC_Dataset_For_WSSS(args.data_dir, 'train_aug', 'VOC2012/VOCdevkit/VOC2012/saliency_map/', train_transform)
+    train_dataset = VOC_Dataset_For_MNSS(
+        args.data_dir, 'VOC2012/VOCdevkit/VOC2012/saliency_map/' ,'train_aug',train_transform)
+    # valid_dataset = VOC_Dataset_For_Segmentation(args.data_dir, 'train', test_transform)
+    valid_dataset = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', test_transform)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
     valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, shuffle=False, drop_last=True)
@@ -153,6 +183,15 @@ if __name__ == '__main__':
     log_func('[i] val_iteration : {:,}'.format(val_iteration))
     log_func('[i] max_iteration : {:,}'.format(max_iteration))
     
+
+    network_data = torch.load('/media/ders/zhangyumin/superpixel_fcn/result/VOCAUG/SpixelNet1l_bn_adam_3000000epochs_epochSize6000_b32_lr5e-05_posW0.003_21_09_15_21_42/model_best.tar')
+    #network_data = torch.load('/media/ders/zhangyumin/PuzzleCAM/experiments/models/train_Q_relu/2021-10-10 02:07:46.pth')
+    print("=> using pre-trained model '{}'".format(network_data['arch']))
+    Q_model = models.__dict__[network_data['arch']]( data = network_data).cuda()
+    Q_model.load_state_dict(torch.load('/media/ders/zhangyumin/PuzzleCAM/experiments/models/train_Q_relu/2021-10-10 02:07:46.pth'))
+    Q_model = nn.DataParallel(Q_model)
+    Q_model.eval()
+
     ###################################################################################
     # Network
     ###################################################################################
@@ -162,8 +201,12 @@ if __name__ == '__main__':
         model = Seg_Model(args.backbone, num_classes=meta_dic['classes'] + 1)
     elif args.architecture == 'CSeg_Model':
         model = CSeg_Model(args.backbone, num_classes=meta_dic['classes'] + 1)
+    elif args.architecture == 'resnet38':
+        model =  resnet38Net(num_classes=meta_dic['classes'] + 1)
+        weights_dict = core.resnet38d.convert_mxnet_to_torch('/media/ders/zhangyumin/PuzzleCAM/experiments/models/train_kmeansesp_saientcy_resnest50.pth')
+        model.load_state_dict(weights_dict, strict=False)
 
-    param_groups = model.get_parameter_groups(None)
+    param_groups = model.get_parameter_groups()
     params = [
         {'params': param_groups[0], 'lr': args.lr, 'weight_decay': args.wd},
         {'params': param_groups[1], 'lr': 2*args.lr, 'weight_decay': 0},
@@ -173,7 +216,8 @@ if __name__ == '__main__':
     
     model = model.cuda()
     model.train()
-
+    #model.load_state_dict(torch.load('experiments/models/train_kmeansesp_saientcy_resnest50_withquforqdetach.pth'))
+    #model.load_state_dict(torch.load('/media/ders/mazhiming/PCAM/experiments/models/train_10.1.pth'))
     log_func('[i] Architecture is {}'.format(args.architecture))
     log_func('[i] Total Params: %.2fM'%(calculate_parameters(model)))
     log_func()
@@ -218,10 +262,10 @@ if __name__ == '__main__':
     train_timer = Timer()
     eval_timer = Timer()
 
-    train_meter = Average_Meter(['loss'])
+    train_meter = Average_Meter(['loss','km_loss'])
 
     best_valid_mIoU = -1
-
+    '''
     def evaluate(loader):
         model.eval()
         eval_timer.tik()
@@ -233,8 +277,13 @@ if __name__ == '__main__':
             for step, (images, labels) in enumerate(loader):
                 images = images.cuda()
                 labels = labels.cuda()
-
+ 
                 logits = model(images)
+                logits=F.softmax(logits,1)
+                output = Q_model(images)
+                logits=train_util.upfeat(logits, output, 16, 16).cuda()
+                logits[:,0,:,:]=0.3
+
                 predictions = torch.argmax(logits, dim=1)
                 
                 # for visualization
@@ -270,30 +319,190 @@ if __name__ == '__main__':
         model.train()
         
         return meter.get(clear=True)
+    '''
+    thresholds = list(np.arange(0.15, 0.25, 0.1))
+    '''
+    def evaluate(loader):
+        model.eval()
+        eval_timer.tik()
+
+        #meter_dic = {th : Calculator_For_mIoU('./data/VOC_2012.json') for th in thresholds}
+        meter_dic = {th : IOUMetric(21) for th in thresholds}
+
+        with torch.no_grad():
+            length = len(loader)
+            for step, (images, labels, gt_masks) in enumerate(loader):
+                images = images.cuda()
+                labels = labels.cuda()
+
+                logits = model(images)
+                logits=F.softmax(logits,1)
+                logits= logits.narrow(1,1,20)
+                output = Q_model(images)
+                # logits=train_util.upfeat(logits, output, 16, 16).cuda()
+                # features = resize_for_tensors(features, images.size()[-2:])
+                # gt_masks = resize_for_tensors(gt_masks, features.size()[-2:], mode='nearest')
+                mask = labels.unsqueeze(2).unsqueeze(3)
+                cams = (make_cam(logits) * mask)
+                cams=train_util.upfeat(cams, output, 16, 16)
+                # cams = (make_cam(features) * mask)
+
+                # for visualization
+                if step == 0:
+                    obj_cams = cams.max(dim=1)[0]
+                    
+                    for b in range(8):
+                        image = get_numpy_from_tensor(images[b])
+                        cam = get_numpy_from_tensor(obj_cams[b])
+
+                        image = denormalize(image, imagenet_mean, imagenet_std)[..., ::-1]
+                        h, w, c = image.shape
+
+                        cam = (cam * 255).astype(np.uint8)
+                        cam = cv2.resize(cam, (w, h), interpolation=cv2.INTER_LINEAR)
+                        cam = colormap(cam)
+
+                        image = cv2.addWeighted(image, 0.5, cam, 0.5, 0)[..., ::-1]
+                        image = image.astype(np.float32) / 255.
+
+                        writer.add_image('CAM/{}'.format(b + 1), image, iteration, dataformats='HWC')
+
+                for batch_index in range(images.size()[0]):
+                    # c, h, w -> h, w, c
+                    cam = get_numpy_from_tensor(cams[batch_index]).transpose((1, 2, 0))
+                    gt_mask = get_numpy_from_tensor(gt_masks[batch_index])
+
+                    h, w, c = cam.shape
+                    gt_mask = cv2.resize(gt_mask, (w, h), interpolation=cv2.INTER_NEAREST)
+
+                    for th in thresholds:
+                        bg = np.ones_like(cam[:, :, 0]) * th
+                        pred_mask = np.argmax(np.concatenate([bg[..., np.newaxis], cam], axis=-1), axis=-1)
+
+                        meter_dic[th].add_batch(pred_mask, gt_mask)
+
+                # break
+
+                sys.stdout.write('\r# Evaluation [{}/{}] = {:.2f}%'.format(step + 1, length, (step + 1) / length * 100))
+                sys.stdout.flush()
+        
+        print(' ')
+        model.train()
+        
+        best_th = 0.0
+        best_mIoU = 0.0
+
+        for th in thresholds:
+            #mIoU, mIoU_foreground = meter_dic[th].get(clear=True)
+            _,_,_,_,_,_,_,mIoU, _=meter_dic[th].evaluate()
+            if best_mIoU < mIoU:
+                best_th = th
+                best_mIoU = mIoU
+
+        return  best_mIoU,best_th
+    '''
     
     writer = SummaryWriter(tensorboard_dir)
     train_iterator = Iterator(train_loader)
 
     torch.autograd.set_detect_anomaly(True)
-
     for iteration in range(max_iteration):
-        images, labels = train_iterator.get()
-        images, labels = images.cuda(), labels.cuda()
+        images, imgids,labels,masks,sailencys= train_iterator.get()
+        images = images.cuda()
+        labels = labels.cuda()
+        sailencys = sailencys.cuda().view(sailencys.shape[0],1,sailencys.shape[1],sailencys.shape[2])/255.0
         #################################################################################################
         # Inference
         #################################################################################################
+        output = Q_model(images)
+
+        prob = output.clone().cuda(1)
+
         logits = model(images)
+        _, _, h, w = logits.size()
+        # sailencys = F.interpolate(sailencys, size=(h, w))
+        sailencys = train_util.poolfeat(sailencys.cuda(1), prob, 16, 16).cuda(0)
+
+        tagpred = F.avg_pool2d(logits, kernel_size=(h, w), padding=0)#
+        loss_cls = F.multilabel_soft_margin_loss(tagpred[:, 1:].view(tagpred.size(0), -1), labels[:,1:])
+        N, C ,H,W= images.shape
+        if(True):
+            cam=logits
+            b, c, h, w = cam.size()
+            sailencys = F.interpolate(sailencys.float(), size=(h, w))
+
+            label_map = labels[:,1:].view(b, 20, 1, 1).expand(size=(b, 20, h, w)).bool()#label_map_bg[0,:,0,0]
+            # Map selection
+            label_map_fg = torch.zeros(size=(b, 21, h, w)).bool().cuda()
+            label_map_bg = torch.zeros(size=(b, 21, h, w)).bool().cuda()
+
+            label_map_bg[:, 0] = True
+            label_map_fg[:,1:] = label_map.clone()
+
+            sal_pred = F.softmax(cam, dim=1) 
+
+            iou_saliency = (torch.round(sal_pred[:, 1:].detach()) * torch.round(sailencys)).view(b, 20, -1).sum(-1) / \
+                        (torch.round(sal_pred[:, 1:].detach()) + 1e-04).view(b, 20, -1).sum(-1)
+
+            valid_channel = (iou_saliency > 0.4).view(b, 20, 1, 1).expand(size=(b, 20, h, w))
+            
+            label_fg_valid = label_map & valid_channel
+
+            label_map_fg[:, 1:] = label_fg_valid
+            label_map_bg[:, 1:] = label_map & (~valid_channel)
+
+            # Saliency loss
+            fg_map = torch.zeros_like(sal_pred).cuda()
+            bg_map = torch.zeros_like(sal_pred).cuda()
+
+            fg_map[label_map_fg] = sal_pred[label_map_fg]
+            bg_map[label_map_bg] = sal_pred[label_map_bg]
+
+            fg_map = torch.sum(fg_map, dim=1, keepdim=True)
+            bg_map = torch.sum(bg_map, dim=1, keepdim=True)
+    
+            bg_map = torch.sub(1, bg_map) #label_map_fg[1,:,0,0] torch.sum(fg_map[7][0]>0.5) F.mse_loss(2*fg_map,sailencys) 
+            sal_pred = fg_map * 0.5 + bg_map * (1 - 0.5) 
+
+            km_loss =F.mse_loss(sal_pred,sailencys)
+       
+    
+        if(True):
+            reconstr_feat=(logits).cuda(1)
+            for i in range(1):
+                reconstr_feat = train_util.upfeat(reconstr_feat, prob, 16, 16)  #reconstr_feat.cpu().numpy()
+                reconstr_feat = train_util.poolfeat(reconstr_feat, prob, 16, 16)
+            q_loss =F.mse_loss(logits*sailencys,reconstr_feat.cuda(0)*sailencys)
+
 
         ###############################################################################
         # The part is to calculate losses.
-        ###############################################################################
-        if 'Seg' in args.architecture:
-            labels = resize_for_tensors(labels.type(torch.FloatTensor).unsqueeze(1), logits.size()[2:], 'nearest', None)[:, 0, :, :]
-            labels = labels.type(torch.LongTensor).cuda()
+        # ###############################################################################
+        # if 'Seg' in args.architecture:
+        #     labels = resize_for_tensors(labels.type(torch.FloatTensor).unsqueeze(1), logits.size()[2:], 'nearest', None)[:, 0, :, :]
+        #     labels = labels.type(torch.LongTensor).cuda()
 
             # print(labels.size(), labels.min(), labels.max())
+        
 
-        loss = class_loss_fn(logits, labels)
+        # if(iteration<2*log_iteration):
+        #     alpha=0.4
+        # if(iteration<5*log_iteration):
+        #     alpha=0.6
+
+        #alpha=1
+        if(iteration<2*log_iteration):
+            alpha=0.9
+        if(iteration>2*log_iteration):
+            alpha=0.9
+            
+        if(iteration>5*log_iteration):
+            alpha=0.6
+        loss= km_loss+loss_cls+alpha*q_loss
+        # loss= loss_cls
+        # loss = class_loss_fn(bin_logits, bin_mask)
+
+        # loss=torch.tensor(0)
         #################################################################################################
         
         optimizer.zero_grad()
@@ -301,20 +510,22 @@ if __name__ == '__main__':
         optimizer.step()
 
         train_meter.add({
-            'loss' : loss.item(), 
+            'loss' : loss_cls.item(), 
+            'km_loss' : km_loss.item(), 
         })
         
         #################################################################################################
         # For Log
         #################################################################################################
         if (iteration + 1) % log_iteration == 0:
-            loss = train_meter.get(clear=True)
+            loss,km_loss = train_meter.get(clear=True)
             learning_rate = float(get_learning_rate_from_optimizer(optimizer))
             
             data = {
                 'iteration' : iteration + 1,
                 'learning_rate' : learning_rate,
                 'loss' : loss,
+                'km_loss' : km_loss, 
                 'time' : train_timer.tok(clear=True),
             }
             data_dic['train'].append(data)
@@ -324,18 +535,22 @@ if __name__ == '__main__':
                 iteration={iteration:,}, \
                 learning_rate={learning_rate:.4f}, \
                 loss={loss:.4f}, \
+                km_loss={km_loss:.4f}, \
                 time={time:.0f}sec'.format(**data)
             )
 
             writer.add_scalar('Train/loss', loss, iteration)
             writer.add_scalar('Train/learning_rate', learning_rate, iteration)
-        
         #################################################################################################
         # Evaluation
         #################################################################################################
+        #val_iteration=1
         if (iteration + 1) % val_iteration == 0:
-            mIoU, _ = evaluate(valid_loader)
+            #mIoU, threshold = evaluate(valid_loader)
+            #best_mIoU,best_th = evaluate(valid_loader)
+            mIoU,re_th = evaluatorA.evaluate(model,'/media/ders/zhangyumin/PuzzleCAM/experiments/models/train_Q_relu/2021-10-10 02:07:46.pth')
 
+            refine,threshold=re_th
             if best_valid_mIoU == -1 or best_valid_mIoU < mIoU:
                 best_valid_mIoU = mIoU
 
@@ -344,6 +559,7 @@ if __name__ == '__main__':
 
             data = {
                 'iteration' : iteration + 1,
+                'threshold' : threshold,
                 'mIoU' : mIoU,
                 'best_valid_mIoU' : best_valid_mIoU,
                 'time' : eval_timer.tok(clear=True),
@@ -355,9 +571,11 @@ if __name__ == '__main__':
                 iteration={iteration:,}, \
                 mIoU={mIoU:.2f}%, \
                 best_valid_mIoU={best_valid_mIoU:.2f}%, \
+                threshold={threshold:.2f}%,\
                 time={time:.0f}sec'.format(**data)
             )
-            
+
+            writer.add_scalar('Evaluation/threshold', threshold, iteration)
             writer.add_scalar('Evaluation/mIoU', mIoU, iteration)
             writer.add_scalar('Evaluation/best_valid_mIoU', best_valid_mIoU, iteration)
     

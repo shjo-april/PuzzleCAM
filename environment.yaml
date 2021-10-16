@@ -1,0 +1,4 @@
+name: zymenv36
+channels:
+  - defaults
+prefix: /media/ders/mazhiming/miniconda3/envs/zymenv36
