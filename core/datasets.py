@@ -42,7 +42,7 @@ class VOC_Dataset(torch.utils.data.Dataset):
 
         self.image_dir = self.root_dir + 'JPEGImages/'
         self.xml_dir = self.root_dir + 'Annotations/'
-        self.mask_dir = self.root_dir + 'SegmentationClassAug/'
+        self.mask_dir = self.root_dir + 'SegmentationClass/'
 
         
         if(type(domain)==str):

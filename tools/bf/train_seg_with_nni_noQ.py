@@ -54,7 +54,7 @@ import  core.models as fcnmodel
 import nni
 
 TIMESTAMP = "{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.now())
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1,0,2,3"
 start_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 def get_params():
 
@@ -70,7 +70,7 @@ def get_params():
     # Network
     ###############################################################################
     parser.add_argument('--architecture', default='Seg_Model', type=str)
-    parser.add_argument('--backbone', default='resnest101', type=str)
+    parser.add_argument('--backbone', default='resnest50', type=str)
     parser.add_argument('--mode', default='fix', type=str)
     parser.add_argument('--use_gn', default=True, type=str2bool)
     #"backbone": {"_type":"choice","_value":["resnet50","resnet101","resnest50","resnest101"]},
@@ -80,7 +80,7 @@ def get_params():
     ###############################################################################
     parser.add_argument('--batch_size', default=32, type=int)
     #parser.add_argument('--batch_size', default=8, type=int)
-    parser.add_argument('--max_epoch', default=20, type=int)
+    parser.add_argument('--max_epoch', default=15, type=int)
 
     parser.add_argument('--lr', default=0.01, type=float)
     parser.add_argument('--wd', default=4e-5, type=float)
@@ -95,13 +95,13 @@ def get_params():
     parser.add_argument('--alpha_final', default=0.5, type=float)
     # parser.add_argument('--sal_or_q', default=False, type=str2bool)
     parser.add_argument('--loss_mask', default=1.0, type=float)
-    parser.add_argument('--tao', default=0.5, type=float)
+    parser.add_argument('--tao', default=0.4, type=float)
 
     ###############################################################################
     # others
     ###############################################################################
     parser.add_argument('--withQ', default=True, type=str2bool)
-    parser.add_argument('--Qloss_rtime', default=2, type=int)
+    parser.add_argument('--withQloss', default=True, type=str2bool)
 
     parser.add_argument('--print_ratio', default=0.1, type=float)
 
@@ -226,7 +226,7 @@ def main(args):
     
     model = model.cuda()
     model.train()
-    # model.load_state_dict(torch.load('experiments/models/Q_cams_nni2/2021-10-17 17:44:07.pth'))
+    #model.load_state_dict(torch.load('experiments/models/train_kmeansesp_saientcy_resnest50_withquforqdetach.pth'))
     #model.load_state_dict(torch.load('/media/ders/mazhiming/PCAM/experiments/models/train_10.1.pth'))
     log_func('[i] Architecture is {}'.format(args["architecture"]))
     log_func('[i] Total Params: %.2fM'%(calculate_parameters(model)))
@@ -342,7 +342,7 @@ def main(args):
             sal_loss =F.mse_loss(sal_pred,sailencys)
        
     
-        if(args['withQ'] ):
+        if(args['withQ'] and True):
             # label_map = labels[:,1:].view(16, 20, 1, 1).expand(size=(16, 20, h, w)).bool()#label_map_bg[0,:,0,0]
             q_loss =torch.tensor(0.0).cuda()
             while(True):
@@ -354,16 +354,16 @@ def main(args):
                 curb = b/the_number_of_gpu
                 reconstr_feat=F.softmax(logits[int(curb*gpui):int(curb*(gpui+1))], dim=1).cuda(gpui)
                 cams=reconstr_feat
-                refinecam= refine_with_q(cams,prob[int(curb*gpui):int(curb*(gpui+1))].cuda(gpui),args['Qloss_rtime'])
+                refinecam= refine_with_q(cams,prob[int(curb*gpui):int(curb*(gpui+1))].cuda(gpui),1)
                 loss_mask = args["loss_mask"] +(1-args["loss_mask"])*sailencys
                 loss_mask= loss_mask.cuda()
                 q_loss +=F.mse_loss(cams.cuda(0)*loss_mask[int(curb*gpui):int(curb*(gpui+1))],refinecam.cuda(0)*loss_mask[int(curb*gpui):int(curb*(gpui+1))])/the_number_of_gpu
 
-        else:
-            q_loss=torch.tensor(0)
+
         ###############################################################################
         # The part is to calculate losses.
         # ###############################################################################
+
 
         #alpha=1
         sal_start = args["alpha_sal"]
@@ -423,7 +423,7 @@ def main(args):
         if (iteration + 1) % val_iteration == 0:
             #mIoU, threshold = evaluate(valid_loader)
             #best_mIoU,best_th = evaluate(valid_loader)
-            mIoU,re_th = evaluatorA.evaluate(model,'experiments/models/modelbest17.pth')
+            mIoU,re_th = evaluatorA.evaluate(model,'/media/ders/zhangyumin/PuzzleCAM/experiments/models/train_Q_relu/2021-10-10 02:07:46.pth')
             refine,threshold=re_th
             if best_valid_mIoU == -1 or best_valid_mIoU < mIoU:
                 best_valid_mIoU = mIoU

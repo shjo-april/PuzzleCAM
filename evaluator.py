@@ -39,26 +39,26 @@ import glob
 from PIL import Image
 
 sys.path.append(r"/media/ders/zhangyumin/superpixel_fcn")
-import models
+import  core.models as fcnmodel
 ###################################################################################
 imagenet_mean = [0.485, 0.456, 0.406]
 imagenet_std = [0.229, 0.224, 0.225]
-palette_img_PIL = Image.open(r"/media/ders/zhangyumin/irn-master/VOCdevkit/VOC2012/SegmentationClass/2007_000039.png")
+palette_img_PIL = Image.open(r"VOC2012/SegmentationClass/2007_000033.png")
 palette = palette_img_PIL.getpalette()
 
 class evaluator:
-    def __init__(self,domain='train') -> None:
-        self.cam_dir = None
-        self.Q_dir = None
+    def __init__(self,domain='train',withQ=True,savept=False,savepng=False,fast_eval=True,first_check=(320,70.5),scale_list=[0.5,1,1.5,2.0,-0.5,-1,-1.5,-2.0]) -> None:
         self.C_model = None
         self.Q_model = None
         self.proxy_Q_model =None
-        self.fast_eval =True#eval的时候会缩小尺寸，精度会有所偏差
-        self.first_check = (320,70.5)
+        self.with_Q =withQ
 
-        # self.scale_list  = [0.5,-0.5]#- is flip
+
+        self.fast_eval =fast_eval#eval的时候会缩小尺寸，精度会有所偏差
+        self.first_check = first_check
+
         self.scale_list  = [0.5,1,1.5,2.0,-0.5,-1,-1.5,-2.0]#- is flip
-        self.scale_list  = [0.5,1,1.5,2.0]#- is flip
+        self.scale_list  = scale_list
 
         self.th_list = [0.25,0.3]
         #self.refine_list = [0]
@@ -78,14 +78,14 @@ class evaluator:
         
         self.batch_size = 8
         self.Top_Left_Crop =False
-
+        self.savept   = savept
         self.ptsave_path=[None,None,None]
-        self.save   = True
-        self.save_path='/media/ders/zhangyumin/PuzzleCAM/experiments/res/cam_test/'
-
+        self.savepng   = savepng
+        self.save_path='experiments/res/cam_test/'
+        if not os.path.exists( self.save_path):
+                os.mkdir(self.save_path)
         self.tag    = 'test'
         self.domain = domain
-        self.meter = IOUMetric(21) 
 
         test_transform = transforms.Compose([
         Normalize_For_Segmentation(imagenet_mean, imagenet_std),
@@ -98,7 +98,7 @@ class evaluator:
             Transpose_For_Segmentation()
             ])
             self.batch_size = 1 
-        valid_dataset =VOC_Dataset_For_Evaluation('VOC2012/VOCdevkit/VOC2012/', self.domain, test_transform)
+        valid_dataset =VOC_Dataset_For_Evaluation('VOC2012/', self.domain, test_transform)
         self.valid_loader = DataLoader(valid_dataset, batch_size= self.batch_size, num_workers=1, shuffle=False, drop_last=True)
         pass
 
@@ -154,7 +154,8 @@ class evaluator:
         _,_,h,w=Q_list[self.scale_list.index(1.0)].shape
         refine_cam_list=[]
         for cam,Q,s in zip(cam_list,Q_list,self.scale_list):
-                cam=upfeat(cam,Q,16,16)
+                if(self.with_Q):
+                    cam=upfeat(cam,Q,16,16)
                 cam = F.interpolate(cam,(int(h),int(w)), mode='bilinear', align_corners=False)
                 if(s<0):
                    cam = torch.flip(cam,dims=[3])#?dims 
@@ -194,13 +195,13 @@ class evaluator:
                                 model_list[i] = Seg_Model('resnest50', num_classes=20 + 1)
                                 model_list[i] = model_list[i].cuda()
                             elif(i==1):
-                                network_data = torch.load('/media/ders/zhangyumin/superpixel_fcn/result/VOCAUG/SpixelNet1l_bn_adam_3000000epochs_epochSize6000_b32_lr5e-05_posW0.003_21_09_15_21_42/model_best.tar')
-                                model_list[i] = models.__dict__[network_data['arch']]( data = network_data).cuda()
+                                model_list[i] = fcnmodel.SpixelNet1l_bn().cuda()
                             else:
                                 assert False ,'proxy_Q_model必须是现成的'
                             model_list[i].load_state_dict(torch.load(modelpath))
                             model_list[i].eval()
-                            self.ptsave_path[i]=modelpt_path
+                            if(self.savept):
+                                self.ptsave_path[i]=modelpt_path
             self.C_model,self.Q_model,self.proxy_Q_model =model_list
 
             with torch.no_grad():
@@ -229,7 +230,8 @@ class evaluator:
 
                     for renum in range(len(self.refine_list)):
                         refinetime =self.refine_list[0] if renum==0 else 5
-                        refine_cam= refine_with_q(refine_cam,refinQ,refinetime)
+                        if(self.with_Q):
+                            refine_cam= refine_with_q(refine_cam,refinQ,refinetime)
                         cams = (make_cam(refine_cam) * mask)
                         if not self.Top_Left_Crop:
                             resc=1
@@ -244,7 +246,7 @@ class evaluator:
                                 gt_mask = get_numpy_from_tensor(gt_masks[batch_index])
                                 gt_mask=cv2.resize(gt_mask,(pred_mask.shape[1],pred_mask.shape[0]), interpolation=cv2.INTER_NEAREST)
                                 self.meterlist[self.parms.index((self.refine_list[renum],th))].add(pred_mask, gt_mask)#self.getbest_miou(clear=False)
-                                if(False):
+                                if(self.savepng):
                                     if(self.C_model!=None):
                                         img_path=os.path.join(self.save_path,image_ids[batch_index]+'.png')
                                         img_pil2= Image.fromarray(pred_mask.astype(np.uint8))

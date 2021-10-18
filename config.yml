@@ -1,6 +1,6 @@
 authorName: default
 experimentName: example_mnist_pytorch
-trialConcurrency: 1
+trialConcurrency: 2
 maxExecDuration: 150h
 maxTrialNum: 150
 #choice: local, remote
@@ -11,23 +11,23 @@ useAnnotation: false
 tuner:
   #choice: TPE, Random, Anneal, Evolution, BatchTuner, MetisTuner, GPTuner
   #SMAC (SMAC should be installed through nnictl)
-  builtinTunerName: TPE
-  classArgs:
-    #choice: maximize, minimize
-    optimize_mode: maximize
+  builtinTunerName: GridSearch
+  # classArgs:
+  #   #choice: maximize, minimize
+  #   optimize_mode: maximize
 assessor:
   #choice: Medianstop, Curvefitting
   builtinAssessorName: Curvefitting
   classArgs:
-      epoch_num: 12
-      start_step: 4
-      threshold: 0.99
+      epoch_num: 15
+      start_step: 5
+      threshold: 0.9
       gap: 1
 trial:
   command: python3 train_seg_with_nni.py
   codeDir: .
-  gpuNum: 1
+  gpuNum: 4
 localConfig:
-  gpuIndices: 0,1,2,3
+  gpuIndices: 0,1,2,3,4,5,6,7
   useActiveGpu: True
   maxTrialNumPerGpu: 1

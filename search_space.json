@@ -1,5 +1,6 @@
 {
-    "alpha_sal":{"_type": "quniform", "_value": [0, 1.0, 0.1]},
-    "alpha_final":{"_type": "quniform", "_value": [0, 1.0, 0.1]},
-    "loss_mask":{"_type": "quniform", "_value": [0, 1.0, 0.1]}
+    "withQ": {"_type":"choice","_value":[true]},
+    "Qloss_rtime": {"_type":"choice","_value":[1]},
+    "tao":{"_type": "choice", "_value": [ 0.4, 0.5]},
+    "backbone": {"_type":"choice","_value":["resnest50","resnest101","resnet50","resnet50"]}
 }

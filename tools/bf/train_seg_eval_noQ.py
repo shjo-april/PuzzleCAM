@@ -29,8 +29,7 @@ from tools.general.time_utils import *
 from tools.general.json_utils import *
 
 #import evaluate
-import evaluator_noQ
-evaluatorA=evaluator_noQ.evaluator(domain='train')
+import evaluator
 
 from tools.ai.log_utils import *
 from tools.ai.demo_utils import *
@@ -42,14 +41,7 @@ from tools.ai.augment_utils import *
 from tools.ai.randaugment import *
 from datetime import datetime
 
-BASE_DIR = r"/media/ders/zhangyumin/SPML"
-sys.path.append(BASE_DIR)
-sys.path.append(r"/media/ders/zhangyumin/superpixel_fcn")
-import core.resnet38d
 
-import models
-from loss import *
-import train_util
 
 TIMESTAMP = "{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.now())
 os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
@@ -61,7 +53,7 @@ start_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 ###############################################################################
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=4, type=int)
-parser.add_argument('--data_dir', default='/media/ders/zhangyumin/DATASETS/dataset/newvoc/VOCdevkit/VOC2012/', type=str)
+parser.add_argument('--data_dir', default='VOC2012/', type=str)
 
 ###############################################################################
 # Network
@@ -119,6 +111,7 @@ if __name__ == '__main__':
     
     log_func('[i] {}'.format(args.tag))
     log_func()
+    evaluatorA=evaluator.evaluator(domain='train',withQ=False,first_check=(320,65))
 
     ###################################################################################
     # Transform, Dataset, DataLoader
@@ -157,7 +150,7 @@ if __name__ == '__main__':
     
     # train_dataset = VOC_Dataset_For_WSSS(args.data_dir, 'train_aug', 'VOC2012/VOCdevkit/VOC2012/saliency_map/', train_transform)
     train_dataset = VOC_Dataset_For_MNSS(
-        args.data_dir, 'VOC2012/VOCdevkit/VOC2012/saliency_map/' ,'train_aug',train_transform)
+        args.data_dir, 'VOC2012/saliency_map/' ,'train_aug',train_transform)
     # valid_dataset = VOC_Dataset_For_Segmentation(args.data_dir, 'train', test_transform)
     valid_dataset = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', test_transform)
 
@@ -194,10 +187,7 @@ if __name__ == '__main__':
         model = Seg_Model(args.backbone, num_classes=meta_dic['classes'] + 1)
     elif args.architecture == 'CSeg_Model':
         model = CSeg_Model(args.backbone, num_classes=meta_dic['classes'] + 1)
-    elif args.architecture == 'resnet38':
-        model =  resnet38Net(num_classes=meta_dic['classes'] + 1)
-        weights_dict = core.resnet38d.convert_mxnet_to_torch('/media/ders/zhangyumin/PuzzleCAM/experiments/models/train_kmeansesp_saientcy_resnest50.pth')
-        model.load_state_dict(weights_dict, strict=False)
+
 
     param_groups = model.get_parameter_groups()
     params = [
@@ -255,7 +245,7 @@ if __name__ == '__main__':
     train_timer = Timer()
     eval_timer = Timer()
 
-    train_meter = Average_Meter(['loss','km_loss'])
+    train_meter = Average_Meter(['loss','sal_loss'])
 
     best_valid_mIoU = -1
     '''
@@ -456,15 +446,9 @@ if __name__ == '__main__':
             bg_map = torch.sub(1, bg_map) #label_map_fg[1,:,0,0] torch.sum(fg_map[7][0]>0.5) F.mse_loss(2*fg_map,sailencys) 
             sal_pred = fg_map * 0.5 + bg_map * (1 - 0.5) 
 
-            km_loss =F.mse_loss(sal_pred,sailencys)
+            sal_loss =F.mse_loss(sal_pred,sailencys)
        
     
-        if(False):
-            reconstr_feat=(logits).cuda(1)
-            for i in range(1):
-                reconstr_feat = train_util.upfeat(reconstr_feat, prob, 16, 16)  #reconstr_feat.cpu().numpy()
-                reconstr_feat = train_util.poolfeat(reconstr_feat, prob, 16, 16)
-            q_loss =F.mse_loss(logits*sailencys,reconstr_feat.cuda(0)*sailencys)
 
 
         ###############################################################################
@@ -482,15 +466,8 @@ if __name__ == '__main__':
         # if(iteration<5*log_iteration):
         #     alpha=0.6
 
-        #alpha=1
-        if(iteration<2*log_iteration):
-            alpha=1
-        if(iteration>2*log_iteration):
-            alpha=0.8
-            
-        if(iteration>5*log_iteration):
-            alpha=0.5
-        loss= km_loss+loss_cls
+
+        loss= sal_loss+loss_cls
         # loss= loss_cls
         # loss = class_loss_fn(bin_logits, bin_mask)
 
@@ -503,21 +480,21 @@ if __name__ == '__main__':
 
         train_meter.add({
             'loss' : loss_cls.item(), 
-            'km_loss' : km_loss.item(), 
+            'sal_loss' : sal_loss.item(), 
         })
         
         #################################################################################################
         # For Log
         #################################################################################################
         if (iteration + 1) % log_iteration == 0:
-            loss,km_loss = train_meter.get(clear=True)
+            loss,sal_loss = train_meter.get(clear=True)
             learning_rate = float(get_learning_rate_from_optimizer(optimizer))
             
             data = {
                 'iteration' : iteration + 1,
                 'learning_rate' : learning_rate,
                 'loss' : loss,
-                'km_loss' : km_loss, 
+                'sal_loss' : sal_loss, 
                 'time' : train_timer.tok(clear=True),
             }
             data_dic['train'].append(data)
@@ -527,7 +504,7 @@ if __name__ == '__main__':
                 iteration={iteration:,}, \
                 learning_rate={learning_rate:.4f}, \
                 loss={loss:.4f}, \
-                km_loss={km_loss:.4f}, \
+                sal_loss={sal_loss:.4f}, \
                 time={time:.0f}sec'.format(**data)
             )
 
@@ -540,7 +517,7 @@ if __name__ == '__main__':
         if (iteration + 1) % val_iteration == 0:
             #mIoU, threshold = evaluate(valid_loader)
             #best_mIoU,best_th = evaluate(valid_loader)
-            mIoU,re_th = evaluatorA.evaluate(model,'/media/ders/zhangyumin/PuzzleCAM/experiments/models/train_Q_relu.pth')
+            mIoU,re_th = evaluatorA.evaluate(model,None)
 
             refine,threshold=re_th
             if best_valid_mIoU == -1 or best_valid_mIoU < mIoU:

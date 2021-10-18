@@ -68,16 +68,16 @@ class evaluator:
                 self.parms.append((renum,th))
         self.meterlist=[ Calculator_For_mIoU('./data/VOC_2012.json') for x in self.parms]
 
-
-        self.flip   = True
-
         
         self.batch_size = 8
         self.Top_Left_Crop =False
 
         self.ptsave_path=[None,None,None]
-        self.save   = True
+        self.save_pt   = False
         self.save_path='/media/ders/zhangyumin/PuzzleCAM/experiments/res/cam_test_noQ/'
+        self.save_path= None
+
+
         if not os.path.exists(self.save_path):
                 os.mkdir(self.save_path)
         self.tag    = 'test'
@@ -241,7 +241,7 @@ class evaluator:
                                 gt_mask = get_numpy_from_tensor(gt_masks[batch_index])
                                 gt_mask=cv2.resize(gt_mask,(pred_mask.shape[1],pred_mask.shape[0]), interpolation=cv2.INTER_NEAREST)
                                 self.meterlist[self.parms.index((self.refine_list[renum],th))].add(pred_mask, gt_mask)#self.getbest_miou(clear=False)
-                                if(True):
+                                if(self.save_path!=None):
                                     if(self.C_model!=None):
                                         img_path=os.path.join(self.save_path,image_ids[batch_index]+'.png')
                                         img_pil2= Image.fromarray(pred_mask.astype(np.uint8))

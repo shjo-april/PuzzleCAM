@@ -39,10 +39,7 @@ from tools.ai.randaugment import *
 from datetime import datetime
 
 
-sys.path.append(r"/media/ders/zhangyumin/superpixel_fcn")
-import core.resnet38d
-
-import models
+import  core.models as fcnmodel
 TIMESTAMP = "{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.now())
 start_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -186,11 +183,8 @@ if __name__ == '__main__':
     # ]
     #endregion
 
-    network_data = torch.load('/media/ders/fengjinhao/superpixel_fcn-master/VOC_AUG/SpixelNet1l_bn_adam_3000000epochs_epochSize6000_b4_lr5e-05_posW0.003_21_09_29_14_19/model_best.tar')
-    # network_data = torch.load('./result/VOCAUG/SpixelNet1l_bn_adam_3000000epochs_epochSize6000_b32_lr5e-05_posW0.003_21_09_15_21_42')
-    print("=> using pre-trained model '{}'".format(network_data['arch']))
-    model = models.__dict__[network_data['arch']]( data = network_data).cuda()
-    # model.load_state_dict(torch.load('experiments/models/train_Q_relu.pth'))
+    model = fcnmodel.SpixelNet1l_bn().cuda()
+    model.load_state_dict(torch.load('experiments/models/modelbest17.pth'))
 
 
     model = torch.nn.DataParallel(model).cuda()

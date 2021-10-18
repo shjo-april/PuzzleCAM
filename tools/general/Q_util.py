@@ -7,7 +7,8 @@ import cv2
 import sys
 sys.path.append('./third_party/cython')
 from connectivity import enforce_connectivity
-
+    
+init_turn_grid =None
 
 def compute_semantic_pos_loss(prob_in, labxy_feat,  pos_weight = 0.003,  kernel_size=8):
     # this wrt the slic paper who used sqrt of (mse)
@@ -105,7 +106,7 @@ def shift9pos(input, h_shift_unit=1,  w_shift_unit=1):
     return shift_tensor
 
 
-def poolfeat(input, prob, sp_h=2, sp_w=2):
+def poolfeat(input, prob, sp_h=16, sp_w=16):
 
     def feat_prob_sum(feat_sum, prob_sum, shift_feat):
         feat_sum += shift_feat[:, :-1, :, :]
@@ -159,7 +160,7 @@ def poolfeat(input, prob, sp_h=2, sp_w=2):
 
     return pooled_feat
 
-def upfeat(input, prob, up_h=2, up_w=2):
+def upfeat(input, prob, up_h=16, up_w=16):
     # input b*n*H*W  downsampled
     # prob b*9*h*w
     b, c, h, w = input.shape
@@ -400,7 +401,8 @@ def label2one_hot_torch(labels, C=14):
 
     return target.type(torch.float32)
 
-def refine_with_q(input,prob,iter=20,down_size=16):
+def refine_with_q_old(input,prob,iter=20,down_size=16):
+
     if(prob.shape[2]==input.shape[2]):
         for i in range(iter):
             input= poolfeat(input,prob,down_size,down_size)
@@ -411,4 +413,57 @@ def refine_with_q(input,prob,iter=20,down_size=16):
             input= poolfeat(input,prob,down_size,down_size)
     else:
         assert False, '尺寸不对'
+    return input
+def rewith_affmat(input,affmat):
+    b, c, h, w = input.shape
+
+    h_shift = 2
+    w_shift = 2
+
+    p2d = (w_shift, w_shift, h_shift, h_shift)
+    feat_pd = F.pad(input, p2d, mode='constant', value=0)
+    cat_mat=[]
+    for i in range(5):
+         for j in range(5):
+             cat_mat.append(feat_pd[:,:,i:i+h,j:j+w])
+    cat_mat=torch.stack(cat_mat,dim=1)
+    return torch.sum(cat_mat*affmat.reshape(b,25,1,h,w),dim=1)
+
+def get_turn(area=5):
+    def get_in(index):
+        centerlist=[(index-10)%25,(index-5)%25,index,(index+5)%25,(index+10)%25]
+        retlist=[]
+        for x in centerlist:
+            lll = int(x/5)*5
+            retlist+=[(x-2+5)%5+lll,(x-1+5)%5+lll,x,(x+1)%5+lll,(x+2)%5+lll]
+        return torch.tensor(retlist)
+    turn_grid=[]
+    for i in range(25):
+        turn_grid.append(get_in(i))
+
+    return torch.stack(turn_grid)
+
+
+def refine_with_q(input,prob,iter=20,down_size=16):
+    if(iter>0):
+        init_turn_grid=get_turn().reshape(1,25,5,5).cuda()
+        b,c,h,w=prob.shape
+        ini_grid=torch.arange(0,25,1).reshape(1,1,5,5).cuda()
+        ini_grid=label2one_hot_torch(ini_grid,25)
+        ini_grid=ini_grid.repeat(b,1,int(h/(down_size*5))+1,int(w/(down_size*5))+1)[:,:,:int(h/down_size),:int(w/down_size)]
+
+        turn_grid=init_turn_grid.repeat(b,1,int(h/(down_size*5))+1,int(w/(down_size*5))+1)[:,:,:int(h/down_size),:int(w/down_size)]
+
+        up_ini_grid= upfeat(ini_grid,prob)
+        aff_grid = poolfeat(up_ini_grid,prob)  
+        aff_mat = torch.gather(aff_grid,1,turn_grid)
+        if(prob.shape[2]==input.shape[2]):
+            input= poolfeat(input,prob,down_size,down_size)
+            for i in range(iter-1):
+                input= rewith_affmat(input,aff_mat)
+            input = upfeat(input,prob)
+        else:
+            for i in range(iter-1):
+                input= rewith_affmat(input,aff_mat)
+
     return input
