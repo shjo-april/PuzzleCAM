@@ -42,11 +42,11 @@ import sys
 # import models  
 
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "7,8"
-model = Seg_Model('resnest50', num_classes=20 + 1)
+os.environ["CUDA_VISIBLE_DEVICES"] = "5,6"
+model = Seg_Model('resnest101', num_classes=20 + 1)
 model = model.cuda()
 model.train()
-model.load_state_dict(torch.load('/home/ders/home/ders/PuzzleCAM/experiments/models/Q_cams_nni2/2021-10-17 17:44:07.pth'))
+model.load_state_dict(torch.load('experiments/models/Q_cams_nni2/2021-10-18 09:37:01.pth'))
 
 # network_data = torch.load('/media/ders/zhangyumin/superpixel_fcn/result/VOCAUG/SpixelNet1l_bn_adam_3000000epochs_epochSize6000_b32_lr5e-05_posW0.003_21_09_15_21_42/model_best.tar')
 # print("=> using pre-trained model '{}'".format(network_data['arch']))

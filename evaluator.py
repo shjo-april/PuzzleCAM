@@ -62,7 +62,7 @@ class evaluator:
 
         self.th_list = [0.25,0.3]
         #self.refine_list = [0]
-        self.refine_list = [25,30]
+        self.refine_list = [25]
 
         # self.th_list = [0.3]
         # self.refine_list = [20]
@@ -81,7 +81,7 @@ class evaluator:
         self.savept   = savept
         self.ptsave_path=[None,None,None]
         self.savepng   = savepng
-        self.save_path='experiments/res/cam_test/'
+        self.save_path='experiments/res/cam_test2/'
         if not os.path.exists( self.save_path):
                 os.mkdir(self.save_path)
         self.tag    = 'test'
