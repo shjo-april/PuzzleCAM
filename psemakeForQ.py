@@ -66,7 +66,7 @@ class evaluator:
 
         self.th_bg=[0.1]
         self.th_step=[0.4]
-        self.th_
+        self.th_fg =[0.8]#第二小于第一的0.8倍
 
         # self.th_list = [0.3]
         # self.refine_list = [20]
@@ -196,13 +196,19 @@ class evaluator:
 
                     cams = self.get_cam(images,image_ids)
                     torch.cuda.synchronize()
-
+                    Qs=images
                     cams = self.getpse(cams,Qs,tags)
 
 
                     # predictions = self.getpse(cams,Qs)
                     refine_cam = cams.clone()
                     mask=tags.unsqueeze(2).unsqueeze(3).cuda()
+
+                    config_list=[]
+                    for bt in self.th_bg:
+                        for ts in self.th_step:
+                            for tf in  self.th_fg:
+                                config_list.append((bt,ts,tf))
 
                     for renum in range(len(self.refine_list)):
                         refinetime =self.refine_list[0] if renum==0 else 5
