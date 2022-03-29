@@ -107,4 +107,4 @@ Top: original images. Middle: ground truth. Bottom: prediction of the segmentati
 
 <br>
 
-For any issues, please contact <b>Sanghyun Jo</b>, josanghyeokn@gmail.com
+For any issues, please contact <b>Sanghyun Jo</b>, shjo.april@gynetworks.com
