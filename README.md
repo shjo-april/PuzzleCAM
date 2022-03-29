@@ -8,15 +8,13 @@ The official implementation of "Puzzle-CAM: Improved localization via matching p
 - Accepted to ICIP 2021
 - Please cite our paper if the code is helpful to your research. [arxiv](https://arxiv.org/abs/2101.11253)
 ```
-@INPROCEEDINGS{9506058,  
-  author={Jo, Sanghyun and Yu, In-Jae},  
-  booktitle={2021 IEEE International Conference on Image Processing (ICIP)},   
-  title={Puzzle-CAM: Improved Localization Via Matching Partial And Full Features},   
-  year={2021},  
-  volume={},  
-  number={},  
-  pages={639-643},  
-  doi={10.1109/ICIP42928.2021.9506058}
+@inproceedings{jo2021puzzle,
+  title={Puzzle-CAM: Improved localization via matching partial and full features},
+  author={Jo, Sanghyun and Yu, In-Jae},
+  booktitle={2021 IEEE International Conference on Image Processing (ICIP)},
+  pages={639--643},
+  year={2021},
+  organization={IEEE}
 }
 ```
 
