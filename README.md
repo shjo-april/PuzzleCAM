@@ -4,6 +4,8 @@
 # Puzzle-CAM
 The official implementation of "Puzzle-CAM: Improved localization via matching partial and full features".
 
+[[project page]](https://shjo-april.github.io/Puzzle-CAM/) [[arXiv]](https://arxiv.org/abs/2101.11253)
+
 ## Citation
 - Accepted to ICIP 2021
 - Please cite our paper if the code is helpful to your research. [arxiv](https://arxiv.org/abs/2101.11253)
