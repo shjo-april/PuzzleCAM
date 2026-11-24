@@ -6,6 +6,8 @@ The official implementation of "Puzzle-CAM: Improved localization via matching p
 
 [[project page]](https://shjo-april.github.io/Puzzle-CAM/) [[arXiv]](https://arxiv.org/abs/2101.11253)
 
+![Puzzle-CAM in four scenes: the idea, the CAMs after every epoch with and without the puzzle module, the loss ablation, and the results](./res/hero.gif)
+
 ## Citation
 - Accepted to ICIP 2021
 - Please cite our paper if the code is helpful to your research. [arxiv](https://arxiv.org/abs/2101.11253)
@@ -106,6 +108,18 @@ Top: original images. Middle: ground truth. Bottom: prediction of the segmentati
 |:----------------------:|:---:|:----:|
 | DeepLabv3+ ResNeSt-101 | [val.tgz](https://drive.google.com/file/d/1qheW6URAkOmGcVP6-kIstGNc9fSRFuNb/view?usp=sharing) | [test.tgz](https://drive.google.com/file/d/121jfzCBMNXKCm8fdeiHSTgx_dR6DOnH2/view?usp=sharing) |
 | DeepLabv3+ ResNeSt-269 | [val.tgz](https://drive.google.com/file/d/1y6jIK00r4g7WH4sX7akQSDGKKxuJi5AY/view?usp=sharing) | [test.tgz](https://drive.google.com/file/d/1Kx5TOQiSXinZ6563YE0rs4bCATi39qNd/view?usp=sharing) |
+
+## 7. Reproduce the hero GIF
+The GIF at the top is composed from the paper figures in `res/` and from two recorded ResNet-50 training runs in "experiments.zip" (classification loss only, and Puzzle-CAM). It needs no GPU.
+```bash
+# optional: rewrite hero_gif/frames and hero_gif/curves.json from the training logs of experiments.zip
+python3 hero_gif/extract_logs.py --logs experiments/tensorboards
+
+# write res/hero.gif (Pillow 8.2 or later)
+python3 hero_gif/build_gif.py
+```
+- The second scene shows the CAMs of two training images and the CAM mIoU on the PASCAL VOC 2012 train set, both logged after every epoch (single scale): 43.20 with the classification loss only and 47.58 with Puzzle-CAM after 15 epochs. These numbers were logged during training and differ from the final evaluation of the paper (47.82 and 51.53 in Table 1).
+- The committed GIF was rendered on Windows with Segoe UI. On other systems the script falls back to the DejaVu Sans bundled with matplotlib.
 
 <br>
 

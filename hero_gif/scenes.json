@@ -1,0 +1,43 @@
+{
+ "title": "Puzzle-CAM",
+ "badge": "ICIP 2021",
+ "subtitle": "Improved localization via matching partial and full features",
+ "tabs": ["1 · Idea", "2 · Training", "3 · Losses", "4 · Results"],
+ "idea": {
+  "panels": [
+   ["res/figure_1/fig_1_a.png", "(a) CAM of the original image"],
+   ["res/figure_1/fig_1_b.png", "(b) CAMs of the tiled patches"],
+   ["res/figure_1/fig_1_c.png", "(c) Puzzle-CAM (Ours)"]
+  ],
+  "note": "Paper Fig. 1 · class activation maps (CAMs) of one image from an image classifier trained with image-level labels"
+ },
+ "training": {
+  "runs": {
+   "baseline": "ResNet50",
+   "puzzle": "ResNet50@Puzzle@alpha=4.00"
+  },
+  "images": [6, 5],
+  "note": "Recorded ResNet-50 runs (released training logs) · single-scale CAMs and train-set mIoU after every epoch · the paper numbers follow in the next scene"
+ },
+ "losses": {
+  "rows": [
+   ["res/figure_3/figure_3_a.png", "(a) L_{cls}", 47.82, "The classification loss alone keeps the CAM on the discriminative parts."],
+   ["res/figure_3/figure_3_b.png", "(b) L_{cls} + L_{p-cls}", 47.70, "Adding only the classification loss of the tiled patches is similar to the baseline."],
+   ["res/figure_3/figure_3_c.png", "(c) L_{cls} + L_{re}", 49.21, "Adding only the reconstruction loss improves localization for some classes, but several classes are no longer predicted."],
+   ["res/figure_3/figure_3_d.png", "(d) L_{cls} + L_{p-cls} + L_{re}", 51.53, "With all losses, the CAM suppresses over-activation and covers the complete object."]
+  ],
+  "note": "Paper Fig. 3 and Table 1 · CAMs of one image and CAM mIoU on the PASCAL VOC 2012 train set, ResNet-50 backbone"
+ },
+ "results": {
+  "examples": [12, 13],
+  "columns": [["image", "Image"], ["baseline", "AffinityNet"], ["puzzle-cam", "Puzzle-CAM (Ours)"], ["gt", "Ground truth"]],
+  "cards": [
+   ["47.82 → 51.53", "CAM mIoU (+3.71)", "ResNet-50 · VOC 2012 train"],
+   ["74.67", "Pseudo-label mIoU", "ResNeSt-269 · VOC 2012 train"],
+   ["71.9", "Segmentation mIoU · val", "DeepLabv3+ · ResNeSt-269"],
+   ["72.2", "Segmentation mIoU · test", "DeepLabv3+ · ResNeSt-269"]
+  ],
+  "line": "Image-level labels only · no extra parameters · PASCAL VOC 2012",
+  "note": "Examples from the ICIP 2021 presentation: segmentation results predicted by AffinityNet and by Puzzle-CAM · numbers from the paper"
+ }
+}
